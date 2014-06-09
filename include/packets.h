@@ -34,3 +34,7 @@ enum
     ERROR_FILEEXISTS,
     ERROR_NOUSER
 };
+
+// Max size of a TFTP packet, this size may change in the future
+// I gather that it should be around 512 bytes big, not 1024.
+#define MAX_PACKET_SIZE 516
