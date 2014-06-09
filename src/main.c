@@ -8,7 +8,14 @@
 #include <time.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "LICENSE.h"
 
+// lol this is just a hack because I am lazy.
+// Legally, this should never change (unless I want it to).
+char License[] =
+{
+    // TODO: Include license file here
+};
 
 int main(int argc, char **argv)
 {
