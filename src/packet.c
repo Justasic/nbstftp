@@ -56,7 +56,7 @@ void SendData(client_t client, void *data, size_t len)
 	memcpy(pptr, data, len);
 	
 	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, pptr, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
+	int sendlen = sendto(client.fd, p, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
 	if (sendlen == -1)
 	{
 		perror("sendto failed");
