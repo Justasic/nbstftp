@@ -49,6 +49,8 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 	{
 		case PACKET_DATA:
 			printf("Got a data packet\n");
+			if (len < 512)
+				printf("Got end of data packet?\n");
 			break;
 		case PACKET_ERROR:
 		{
@@ -104,14 +106,24 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	
+	if (listen(fd, 0) == -1)
+	{
+		perror("listen");
+		return EXIT_FAILURE;
+	}
+	
 	// Clear our client struct
 	memset(&c, 0, sizeof(client_t));
 	// Enter idle loop.
 	while(running)
 	{
 		printf("Waiting on port %d\n", port);
-		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
-		c.fd = fd;
+		c.fd = accept(fd, &c.addr.sa, &addrlen);
+		
+		printf("Accepted client with descriptor %d\n", c.fd);
+		
+		recvlen = recvfrom(c.fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
+// 		c.fd = fd;
 		
 		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c.addr.in.sin_addr));
 		
