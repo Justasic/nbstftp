@@ -82,8 +82,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 int main(int argc, char **argv)
 {
 	socketstructs_t myaddr;
-	client_t c;
-	socklen_t addrlen = sizeof(c.addr.in);
+
 	int recvlen, fd;
 
 	unsigned char buf[MAX_PACKET_SIZE];
@@ -111,14 +110,23 @@ int main(int argc, char **argv)
 		perror("listen");
 		return EXIT_FAILURE;
 	}
-	
-	// Clear our client struct
-	memset(&c, 0, sizeof(client_t));
+
+
 	// Enter idle loop.
 	while(running)
 	{
 		printf("Waiting on port %d\n", port);
+		client_t c;
+		// Clear our client struct
+		memset(&c, 0, sizeof(client_t));
+		socklen_t addrlen = sizeof(c.addr);
+		
 		c.fd = accept(fd, &c.addr.sa, &addrlen);
+		if (c.fd == -1)
+		{
+			perror("accept");
+			continue;
+		}
 		
 		printf("Accepted client with descriptor %d\n", c.fd);
 		
