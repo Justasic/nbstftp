@@ -19,11 +19,11 @@
 
 enum
 {
-	PACKET_RRQ,   // Read Request packet
-	PACKET_WRQ,   // Write Request packet
-	PACKET_DATA,  // Data packet
-	PACKET_ACK,   // Acknowledgement packet
-	PACKET_ERROR  // Error packet
+	PACKET_RRQ = 1, // Read Request packet
+	PACKET_WRQ,     // Write Request packet
+	PACKET_DATA,    // Data packet
+	PACKET_ACK,     // Acknowledgement packet
+	PACKET_ERROR    // Error packet
 };
 
 /*

@@ -39,8 +39,8 @@ void SendData(client_t client, void *data, size_t len)
 	
 	// Allocate a packet that is as big as the data + len
 	packet_t *p = malloc(len + sizeof(packet_t));
-	p->opcode   = PACKET_DATA;
-	p->blockno  = client.currentblockno++;
+	p->opcode   = htons(PACKET_DATA);
+	p->blockno  = htons(client.currentblockno++);
 	
 	// Cast the pointer, move to the end of the struct,
 	// then copy our data, this will mean we have a full
@@ -105,8 +105,8 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	}
 	
 	packet_t *p = malloc(len + sizeof(packet_t));
-	p->opcode   = PACKET_ERROR;
-	p->blockno  = errnum;
+	p->opcode   = htons(PACKET_ERROR);
+	p->blockno  = htons(errnum);
 	
 	// Fancy casting magic!
 	uint8_t *pptr = (uint8_t*)p;

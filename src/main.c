@@ -41,9 +41,16 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 		Error(client, ERROR_ILLEGAL, "Invalid packet size");
 		return;
 	}
+
+        printf("Received a packet with %d len\n", len);
 	
 	packet_t *p = malloc(len);
+        memset(p, 0, len);
 	memcpy(p, buffer, len);
+        // Reverse the bytes to little-endian
+        p->opcode = ntohs(p->opcode);
+        p->blockno = ntohs(p->blockno);
+
 	
 	switch(p->opcode)
 	{
@@ -71,8 +78,9 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			printf("Got read request packet\n");
 			break;
 		default:
-			printf("Got unknown packet\n");
-			Error(client, ERROR_ILLEGAL, "Unknown packet");
+			printf("Got unknown packet: %d\n", p->opcode);
+                        // Unknown packets are ignored according to the RFC.
+			//Error(client, ERROR_ILLEGAL, "Unknown packet");
 			break;
 	}
 	
@@ -105,13 +113,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	
-	if (listen(fd, 0) == -1)
-	{
-		perror("listen");
-		return EXIT_FAILURE;
-	}
-
-
 	// Enter idle loop.
 	while(running)
 	{
@@ -121,17 +122,8 @@ int main(int argc, char **argv)
 		memset(&c, 0, sizeof(client_t));
 		socklen_t addrlen = sizeof(c.addr);
 		
-		c.fd = accept(fd, &c.addr.sa, &addrlen);
-		if (c.fd == -1)
-		{
-			perror("accept");
-			continue;
-		}
-		
-		printf("Accepted client with descriptor %d\n", c.fd);
-		
-		recvlen = recvfrom(c.fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
-// 		c.fd = fd;
+		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
+ 		c.fd = fd;
 		
 		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c.addr.in.sin_addr));
 		
