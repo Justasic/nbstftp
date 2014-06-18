@@ -90,6 +90,12 @@ void Acknowledge(client_t client, uint16_t blockno)
 
 void Error(client_t client, const uint16_t errnum, const char *str)
 {
+	//
+	//     2 bytes     2 bytes      string    1 byte
+	//     -------------------------------------------
+	//     | Opcode |  ErrorCode |   ErrMsg   |   0  |
+	//     -------------------------------------------
+	//
 	size_t len = strlen(str);
 	
 	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)

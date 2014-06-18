@@ -55,7 +55,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
 			// to a const char * and send to printf.
 			// WARNING: This could buffer-overflow printf, need to use strlcpy or something safer.
-			const char *error = (const char*)(((uint8_t*)p) + sizeof(packet_t));
+			const char *error = ((const char*)p) + sizeof(packet_t);
 			printf("Error: %s (%d)\n", error, p->blockno);
 			break;
 		}
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 	while(running)
 	{
 		printf("Waiting on port %d\n", port);
-		recvlen = recvfrom(fd, buf, 30/*sizeof(buf)*/, 0, &c.addr.sa, &addrlen);
+		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
 		c.fd = fd;
 		
 		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c.addr.in.sin_addr));
