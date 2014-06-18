@@ -75,8 +75,14 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			printf("Got write request packet\n");
 			break;
 		case PACKET_RRQ:
-			printf("Got read request packet\n");
+                {
+                        // Get the filename and modes
+                        // WARNING: This needs to be fixed with proper length checking!
+                        const char *filename = ((const char *)p) + sizeof(packet_t);
+                        const char *mode = ((const char *)p) + (sizeof(packet_t) + strlen(filename));
+			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
 			break;
+                }
 		default:
 			printf("Got unknown packet: %d\n", p->opcode);
                         // Unknown packets are ignored according to the RFC.

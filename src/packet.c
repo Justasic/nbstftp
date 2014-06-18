@@ -116,7 +116,7 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	pptr[len] = 0;
 	
 	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, pptr, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
+	int sendlen = sendto(client.fd, p, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
 	if (sendlen == -1)
 	{
 		perror("sendto failed");
