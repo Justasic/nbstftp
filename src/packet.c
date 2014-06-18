@@ -76,8 +76,8 @@ void Acknowledge(client_t client, uint16_t blockno)
 	//     -----------------------
 	//
 	packet_t p;
-	p.opcode = PACKET_ACK;
-	p.blockno = blockno;
+	p.opcode = htons(PACKET_ACK);
+	p.blockno = htons(blockno);
 	
 	socklen_t socklen = sizeof(client.addr.in);
 	int sendlen = sendto(client.fd, &p, sizeof(packet_t), 0, &client.addr.sa, socklen);
@@ -113,7 +113,7 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	pptr += sizeof(packet_t);
 	strncpy((char*)pptr, str, len);
 	// guaranteed null-termination.
-	pptr[len] = 0;
+	pptr[len-1] = 0;
 	
 	socklen_t socklen = sizeof(client.addr.in);
 	int sendlen = sendto(client.fd, p, len + sizeof(packet_t), 0, &client.addr.sa, socklen);

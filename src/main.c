@@ -47,12 +47,8 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 	packet_t *p = malloc(len);
         memset(p, 0, len);
 	memcpy(p, buffer, len);
-        // Reverse the bytes to little-endian
-        p->opcode = ntohs(p->opcode);
-        p->blockno = ntohs(p->blockno);
-
 	
-	switch(p->opcode)
+	switch(ntohs(p->opcode))
 	{
 		case PACKET_DATA:
 			printf("Got a data packet\n");
@@ -65,7 +61,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// to a const char * and send to printf.
 			// WARNING: This could buffer-overflow printf, need to use strlcpy or something safer.
 			const char *error = ((const char*)p) + sizeof(packet_t);
-			printf("Error: %s (%d)\n", error, p->blockno);
+			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 			break;
 		}
 		case PACKET_ACK:
@@ -78,13 +74,19 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
                 {
                         // Get the filename and modes
                         // WARNING: This needs to be fixed with proper length checking!
-                        const char *filename = ((const char *)p) + sizeof(packet_t);
-                        const char *mode = ((const char *)p) + (sizeof(packet_t) + strlen(filename));
+                        //
+                        // Since we dig only past the first value in the struct, we only
+                        // get the size of that first value (eg, the uint16_t)
+                        const char *filename = ((const char *)p) + sizeof(uint16_t);
+                        // This one is a bit weirder. We get the size of the uint16 like
+                        // we did above but also skip our filename string AND the remaining
+                        // null byte which strlen does not include.
+                        const char *mode = ((const char *)p) + (sizeof(uint16_t) + strlen(filename) + 1);
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
 			break;
                 }
 		default:
-			printf("Got unknown packet: %d\n", p->opcode);
+			printf("Got unknown packet: %d\n", ntohs(p->opcode));
                         // Unknown packets are ignored according to the RFC.
 			//Error(client, ERROR_ILLEGAL, "Unknown packet");
 			break;
