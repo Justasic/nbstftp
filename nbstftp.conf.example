@@ -1,0 +1,33 @@
+// The No bullshit config file for the No bullshit TFTP server!
+//
+// This file is pretty simple, one block (so far) with a few
+// configuration lines.
+//
+// Single line comments are supported as C++ style "//"
+// Multi-line comments are supported as C-style "/* */"
+// blocks (eg, parts which look like "blah { ... }") do not require semi-colons
+// but their contents do. See below to know what the hell I am talking about.
+//
+
+// Server configuration
+server
+{
+        // Address to bind to (optional)
+        bind = "0.0.0.0";
+        
+        // Port to listen on (69 by default)
+        //port = 69;
+
+        // Directory to serve (manditory)
+        directory = "/tftpboot/";
+
+        // User to run the daemon as (default is to remain running as the
+        // user who executed the daemon)
+        //user = "someuser";
+
+        // Group to run the daemon as (default is also to remain as executing user)
+        //group = "somegroup";
+
+        // Whether or not to daemonize to the background (default is true)
+        //daemonize = true;
+}
