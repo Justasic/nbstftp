@@ -32,6 +32,12 @@
 int running = 1;
 short port = 69;
 
+// Fork to background unless otherwise specified
+int nofork = 0;
+int ipv4_only = 0;
+int ipv6_only = 0;
+char *configfile = NULL;
+
 // Process the incoming packet.
 void ProcessPacket(client_t client, void *buffer, size_t len)
 {
@@ -42,8 +48,6 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 		return;
 	}
 
-        printf("Received a packet with %d len\n", len);
-	
 	packet_t *p = malloc(len);
         memset(p, 0, len);
 	memcpy(p, buffer, len);
@@ -83,6 +87,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
                         // we did above but also skip our filename string AND the remaining
                         // null byte which strlen does not include.
                         const char *mode = ((const char *)p) + (sizeof(uint16_t) + strlen(filename) + 1);
+			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
 			break;
                 }
@@ -96,8 +101,134 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 	free(p);
 }
 
+void PrintHelp(void)
+{
+	fprintf(stderr, "Usage: nbstftp [OPTION]... [INTERFACE [PORT]]\n");
+	fprintf(stderr, "The no bullshit TFTP server, used to serve files over TFTP\n");
+	fprintf(stderr, "\nOptions:\n");
+	fprintf(stderr, "-f, --nofork        Do not daemonize (don't fork to background)\n");
+	fprintf(stderr, "-c, --config        Specify a config file\n");
+	fprintf(stderr, "-4, --ipv4          Only bind to IPv4 interfaces\n");
+	fprintf(stderr, "-6, --ipv6          Only bind to IPv6 interfaces\n");
+	fprintf(stderr, "-p, --port          Specify a port to listen on\n");
+	fprintf(stderr, "-h, --help          This message\n");
+	fprintf(stderr, "-l, --license       Print license message\n");
+	
+	exit(EXIT_FAILURE);
+}
+
+void PrintLicense(void)
+{
+	// Print the license header.
+	char *str = malloc(LICENSE_len+1);
+	memcpy(str, LICENSE, LICENSE_len);
+	str[LICENSE_len+1] = 0;
+	fprintf(stderr, "%s", str);
+	free(str);
+	exit(EXIT_FAILURE);
+}
+
+void HandleArguments(int argc, char **argv)
+{
+	int wait_for_conf = 0, wait_for_port = 0;
+	for (int i = 0; i < argc; ++i)
+	{
+		char *arg = argv[i];
+		
+		// Handle -- arguments.
+		if (arg[0] == '-' && arg[1] == '-')
+		{
+			arg += 2;
+			
+			if (!strcasecmp(arg, "help"))
+				PrintHelp();
+			else if (!strcasecmp(arg, "license"))
+				PrintLicense();
+			else if (!strcasecmp(arg, "nofork"))
+				nofork = 1;
+			else if (!strcasecmp(arg, "config"))
+			{ // Make sure they actually specified a config file...
+				if (i+1 >= argc)
+				{
+					fprintf(stderr, "You must specify a config file!\n");
+					exit(EXIT_FAILURE);
+				}
+				wait_for_conf = 1;
+			}
+			else if (!strcasecmp(arg, "port"))
+			{
+				if (i+1 >= argc)
+				{
+					fprintf(stderr, "You must specify a port!\n");
+					exit(EXIT_FAILURE);
+				}
+				wait_for_port = 1;
+			}
+			else if (!strcasecmp(arg, "ipv4"))
+				ipv4_only = 1;
+			else if (!strcasecmp(arg, "ipv6"))
+				ipv6_only = 1;
+			else
+			{
+				fprintf(stderr, "Unknown argument: \"%s\"\n", arg);
+				PrintHelp();
+			}
+		}
+		// Handle single dash arguments.
+		else if (arg[0] == '-' && arg[1] != '-')
+		{
+			arg++;
+			
+			if (!strcasecmp(arg, "h"))
+				PrintHelp();
+			else if (!strcasecmp(arg, "l"))
+				PrintLicense();
+			else if (!strcasecmp(arg, "f"))
+				nofork = 1;
+			else if (!strcasecmp(arg, "c"))
+			{
+				if (i+1 >= argc)
+				{
+					fprintf(stderr, "You must specify a config file!\n");
+					exit(EXIT_FAILURE);
+				}
+				wait_for_conf = 1;
+			}
+			else if (!strcasecmp(arg, "p"))
+			{
+				if (i+1 >= argc)
+				{
+					fprintf(stderr, "You must specify a port!\n");
+					exit(EXIT_FAILURE);
+				}
+				wait_for_port = 1;
+			}
+			else if (!strcasecmp(arg, "4"))
+				ipv4_only = 1;
+			else if (!strcasecmp(arg, "6"))
+				ipv6_only = 1;
+			else
+			{
+				fprintf(stderr, "Unknown argument: \"%s\"\n", arg);
+				PrintHelp();
+			}
+		}
+		else // Handle other arguments.
+		{
+			// Copy the config file
+			if (wait_for_conf)
+				configfile = arg;
+			else if (wait_for_port)
+				port = atoi(arg);
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
+	
+	HandleArguments(argc, argv);
+	
 	socketstructs_t myaddr;
 
 	int recvlen, fd;
