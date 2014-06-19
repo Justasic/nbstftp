@@ -52,7 +52,7 @@ server_item: server_bind | server_port | server_directory | server_user | server
 
 server_bind: BIND '=' STR ';'
 {
-        config->bind = strdup(yylval.sval);
+        config->bindaddr = strdup(yylval.sval);
 };
 
 server_port: PORT '=' CINT ';'

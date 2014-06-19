@@ -27,6 +27,7 @@
 #include <sys/types.h>
 
 #include "packets.h"
+#include "config.h"
 #include "LICENSE.h"
 
 int running = 1;

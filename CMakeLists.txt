@@ -82,6 +82,21 @@ if (NOT HAVE_C11_FLAG)
     message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
 endif (NOT HAVE_C11_FLAG)
 
+find_package(FLEX REQUIRED)
+find_package(BISON REQUIRED)
+
+# Check flex version to prevent yylex_destroy link errors.
+execute_process(COMMAND ${FLEX_EXECUTABLE} -V OUTPUT_VARIABLE flex_out OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REGEX REPLACE "flex[ \t]+" "" FLEX_VERSION ${flex_out})
+if(${FLEX_VERSION} VERSION_LESS "2.5.9")
+        message(FATAL_ERROR "Your flex version is ${FLEX_VERSION}, You must have flex version 2.5.9 or higher!")
+endif(${FLEX_VERSION} VERSION_LESS "2.5.9")
+
+# Generate our flex and bison targets.
+FLEX_TARGET(LEXER ${CMAKE_SOURCE_DIR}/src/scanner.l ${CMAKE_BINARY_DIR}/lexer.c)
+BISON_TARGET(PARSER ${CMAKE_SOURCE_DIR}/src/parser.y ${CMAKE_BINARY_DIR}/parser.c)
+ADD_FLEX_BISON_DEPENDENCY(LEXER PARSER)
+
 # Add our include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -104,7 +119,7 @@ add_custom_target(
     ${OUTPUT_FILE})
 
 # Finally, tell CMake how to build the project
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${FLEX_LEXER_OUTPUTS} ${BISON_PARSER_OUTPUTS})
 set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE C COMPILE_FLAGS "${CFLAGS}")
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C PREFIX "" SUFFIX "" LINK_FLAGS "${LINKFLAGS}")
 add_dependencies(${PROJECT_NAME} license_headers)

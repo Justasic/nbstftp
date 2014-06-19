@@ -12,7 +12,7 @@
 
 %%
 
-/* the tokens */
+ /* the tokens */
 server        { return SERVER; }
 bind          { return BIND; }
 port          { return PORT; }
@@ -22,7 +22,7 @@ group         { return GROUP; }
 daemonize     { return DAEMONIZE; }
 
 
-/* Ignore white space */
+ /* Ignore white space */
 [ \t]             { }
 \n                { ++lineno; }
 [0-9]+            { yylval.ival = atoi(yytext); return CINT; }
