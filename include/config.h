@@ -23,3 +23,5 @@ typedef struct config_s
         const char *group;
         char daemonize;
 } config_t;
+
+extern int ParseConfig(const char *filename);

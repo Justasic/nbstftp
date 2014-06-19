@@ -229,6 +229,11 @@ int main(int argc, char **argv)
 {
 	
 	HandleArguments(argc, argv);
+
+        if (!configfile)
+                configfile = "nbstftp.conf";
+
+        ParseConfig(configfile);
 	
 	socketstructs_t myaddr;
 
