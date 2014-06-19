@@ -33,7 +33,7 @@ void SendData(client_t client, void *data, size_t len)
 	// Make sure the packet size does not exceed the max packet length.
 	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)
 	{
-		printf("Cannot copy %lu bytes into DATA packet: packet too large!\n", len + sizeof(packet_t));
+		printf("Cannot copy %lu bytes into DATA packet: packet too large!\n", (unsigned long)len + sizeof(packet_t));
 		exit(EXIT_FAILURE);
 	}
 	
@@ -100,11 +100,11 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	
 	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)
 	{
-		printf("Cannot copy %lu bytes into ERROR packet: packet too large!\n", len + sizeof(packet_t));
+		printf("Cannot copy %lu bytes into ERROR packet: packet too large!\n",  (unsigned long)len + sizeof(packet_t));
 		exit(EXIT_FAILURE);
 	}
 	
-	packet_t *p = malloc(len + sizeof(packet_t));
+	packet_t *p = malloc(len + sizeof(packet_t) + 1);
 	p->opcode   = htons(PACKET_ERROR);
 	p->blockno  = htons(errnum);
 	
@@ -113,10 +113,10 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	pptr += sizeof(packet_t);
 	strncpy((char*)pptr, str, len);
 	// guaranteed null-termination.
-	pptr[len-1] = 0;
-	
+	pptr[len] = 0;
+
 	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, p, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
+	int sendlen = sendto(client.fd, p, len + sizeof(packet_t) + 1, 0, &client.addr.sa, socklen);
 	if (sendlen == -1)
 	{
 		perror("sendto failed");

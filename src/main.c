@@ -65,10 +65,11 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			break;
 		}
 		case PACKET_ACK:
-			printf("Got Acknowledgement packet\n");
+			printf("Got Acknowledgement packet for block %d\n", ntohs(p->blockno));
 			break;
 		case PACKET_WRQ:
 			printf("Got write request packet\n");
+                        Error(client, ERROR_UNDEFINED, "Operation not supported.");
 			break;
 		case PACKET_RRQ:
                 {
