@@ -59,6 +59,7 @@ if (CLANGXX)
     set(CMAKE_CXX_COMPILER ${CLANGXX})
 endif (CLANGXX)
 
+# Finally initialize our project
 project(nbstftp C)
 
 include (CheckTypeSize)
@@ -76,7 +77,7 @@ check_type_size(uint64_t UINT64_T)
 
 # Make sure the compiler accepts C11
 check_c_compiler_flag(-std=c11 HAVE_C11_FLAG)
-set(CFLAGS "${CFLAGS} -std=c11 -g")
+set(CFLAGS "${CFLAGS} -std=c11 -g -Werror=implicit-function-declaration")
 
 if (NOT HAVE_C11_FLAG)
     message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")

@@ -14,19 +14,5 @@
  */
 #pragma once
 
-typedef struct config_s
-{
-        char *bindaddr;
-        short port;
-        char *directory;
-        char *user;
-        char *group;
-	char *pidfile;
-        char daemonize;
-} config_t;
-
-// Defined in parser.y
-extern config_t *config;
-
-extern int ParseConfig(const char *filename);
-extern void DeallocateConfig(config_t *conf);
+extern int FileExists(const char *file);
+extern int IsDirectory(const char *file);

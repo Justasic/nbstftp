@@ -14,19 +14,12 @@
  */
 #pragma once
 
-typedef struct config_s
-{
-        char *bindaddr;
-        short port;
-        char *directory;
-        char *user;
-        char *group;
-	char *pidfile;
-        char daemonize;
-} config_t;
+extern short port;
 
-// Defined in parser.y
-extern config_t *config;
+// Fork to background unless otherwise specified
+extern int nofork;
+// int ipv4_only = 0;
+// int ipv6_only = 0;
+extern char *configfile;
 
-extern int ParseConfig(const char *filename);
-extern void DeallocateConfig(config_t *conf);
+extern void HandleArguments(int argc, char **argv);

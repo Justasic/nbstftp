@@ -27,8 +27,8 @@ daemonize     { return DAEMONIZE; }
 \n                { ++lineno; }
 [0-9]+            { yylval.ival = atoi(yytext); return CINT; }
 \"[^\"\n]*[\"\n]  { yytext[yyleng - 1] = 0; yylval.sval = yytext + 1; return STR; }
-"true|yes"        { yylval.bval = 1; }
-"false|no"        { yylval.bval = 0; }
+"(true|yes)"        { yylval.bval = 1; }
+"(false|no)"        { yylval.bval = 0; }
 "/*"              { BEGIN(COMMENT); }
 <COMMENT>"*/"     { BEGIN(INITIAL); }
 <COMMENT>([^*]|\n)+|.

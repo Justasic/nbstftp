@@ -12,21 +12,42 @@
  * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#pragma once
+#include "filesystem.h"
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-typedef struct config_s
+
+int FileExists(const char *file)
 {
-        char *bindaddr;
-        short port;
-        char *directory;
-        char *user;
-        char *group;
-	char *pidfile;
-        char daemonize;
-} config_t;
+	struct stat sb;
 
-// Defined in parser.y
-extern config_t *config;
+	if(stat(file, &sb) == -1)
+		return 0;
 
-extern int ParseConfig(const char *filename);
-extern void DeallocateConfig(config_t *conf);
+	if(S_ISDIR(sb.st_mode))
+		return 0;
+
+	FILE *input = fopen(file, "r");
+
+	if(input == NULL)
+		return 0;
+	else
+		fclose(input);
+
+	return 1;
+}
+
+int IsDirectory(const char *dir)
+{
+	struct stat fileinfo;
+	
+	if(stat(dir, &fileinfo) == 0)
+	{
+		if (S_ISDIR(fileinfo.st_mode))
+			return 1;
+	}
+	
+	return 0;
+}

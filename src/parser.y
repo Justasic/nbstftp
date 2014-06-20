@@ -9,8 +9,6 @@ extern void yyerror(const char *s);
 config_t *config;
 %}
 
-
-
 %error-verbose
 
 %union
@@ -30,6 +28,7 @@ config_t *config;
 %token DIRECTORY
 %token USER
 %token GROUP
+%token PIDFILE
 %token DAEMONIZE
 
 
@@ -41,8 +40,11 @@ conf_items: server_entry;
 
 server_entry: SERVER
 {
-        config = malloc(sizeof(config_t));
-        memset(config, 0, sizeof(config_t));
+	config = malloc(sizeof(config_t));
+	memset(config, 0, sizeof(config_t));
+	// Defaults
+	config->port = -1;
+	config->daemonize = 1;
 }
 '{' server_items '}';
 
@@ -52,34 +54,36 @@ server_item: server_bind | server_port | server_directory | server_user | server
 
 server_bind: BIND '=' STR ';'
 {
-        config->bindaddr = strdup(yylval.sval);
+	config->bindaddr = strdup(yylval.sval);
 };
 
 server_port: PORT '=' CINT ';'
 {
-        config->port = yylval.ival;
+	config->port = yylval.ival;
 };
 
 server_directory: DIRECTORY '=' STR ';'
 {
-        config->directory = yylval.sval;
+	config->directory = yylval.sval;
 };
 
 server_user: USER '=' STR ';'
 {
-        config->user = strdup(yylval.sval);
+	config->user = strdup(yylval.sval);
 };
 
 server_group: GROUP '=' STR ';'
 {
-        config->user = strdup(yylval.sval);
+	config->user = strdup(yylval.sval);
 };
 
 
 server_daemonize: DAEMONIZE '=' BOOL ';'
 {
-        config->daemonize = yylval.bval;
+	config->daemonize = yylval.bval;
 };
 
-
-
+server_pidfile: PIDFILE '=' STR ';'
+{
+	config->pidfile = strdup(yylval.sval);
+};

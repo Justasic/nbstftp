@@ -38,7 +38,56 @@ int ParseConfig(const char *filename)
         int ret = yyparse();
         fclose(fd);
         yylex_destroy();
+	
+	
+	printf("Config:\n");
+	if (config)
+		printf(" Bind: %s\n Port: %d\n Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n",
+		       config->bindaddr, config->port, config->directory, config->user, config->group,
+	 config->daemonize);
+	else
+		printf("Config is null!\n");
+	
+	if (!config)
+	{
+		fprintf(stderr, "Failed to parse config file!\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if (!config->directory)
+	{
+		fprintf(stderr, "You must specify a directory to serve files from in the config!\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	// Default is to listen on all interfaces
+	if (!config->bindaddr)
+		config->bindaddr = "0.0.0.0";
+	
+	// Default is to use port 69
+	if (config->port == -1)
+		config->port = 69;
+	
+	if (!config->pidfile)
+		config->pidfile = "/var/run/nbstftp.pid";
+	
+	
         return ret;
+}
+
+void DeallocateConfig(config_t *conf)
+{
+	// Clear memory.
+	if (conf->bindaddr)
+		free(conf->bindaddr);
+	
+	if (conf->user)
+		free(conf->user);
+	
+	if (conf->group)
+		free(conf->group);
+	
+	free(conf);
 }
 
 void yyerror(const char *s)
