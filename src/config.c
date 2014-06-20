@@ -92,6 +92,6 @@ void DeallocateConfig(config_t *conf)
 
 void yyerror(const char *s)
 {
-        fprintf(stderr, "Config: Error parsing line %d: %s\n", lineno, s);
+        fprintf(stderr, "Config: Error parsing line %d: %s\n", lineno+1, s);
         exit(EXIT_FAILURE);
 }
