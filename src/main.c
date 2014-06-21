@@ -33,6 +33,8 @@
 #include "commandline.h"
 #include "filesystem.h"
 
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+
 int running = 1;
 short port = -1;
 
@@ -89,6 +91,9 @@ write:
 	fclose(f);
 }
 
+// FIXME: make a better version of this.
+client_t *currentclient;
+
 // Process the incoming packet.
 void ProcessPacket(client_t client, void *buffer, size_t len)
 {
@@ -107,7 +112,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 	{
 		case PACKET_DATA:
 			printf("Got a data packet\n");
-			if (len < 512)
+			if ((len - sizeof(packet_t)) < 512)
 				printf("Got end of data packet?\n");
 			break;
 		case PACKET_ERROR:
@@ -117,15 +122,55 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// WARNING: This could buffer-overflow printf, need to use strlcpy or something safer.
 			const char *error = ((const char*)p) + sizeof(packet_t);
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
+			
+			// Send an Acknowledgement packet.
+			Acknowledge(client, 1);
 			break;
 		}
 		case PACKET_ACK:
-			printf("Got Acknowledgement packet for block %d\n", ntohs(p->blockno));
-//                         if (client.)
+		{
+			char *addr1 = inet_ntoa(client.addr.in.sin_addr), *addr2 = NULL;
+			
+			if (currentclient)
+				addr2 = inet_ntoa(currentclient->addr.in.sin_addr);
+			
+			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
+			
+			if (!addr2)
+				break;
+			
+			if (strcmp(addr1, addr2) == 0)
+			{
+				uint8_t buf[512];
+				memset(buf, 0, sizeof(buf));
+				size_t readlen = fread(buf, 1, sizeof(buf), currentclient->f);
+				
+				
+				currentclient->currentblockno++;
+				// We're at the end of the file.
+				if (MIN(512, readlen) != 512)
+				{
+					SendData(*currentclient, buf, readlen);
+					printf("Finished sending file\n");
+					// Close the file and clean up.
+					fclose(currentclient->f);
+					free(currentclient);
+					currentclient = NULL;
+					break;
+				}
+				SendData(*currentclient, buf, readlen);
+			}
+			else
+			{
+				printf("Uh-oh. We can't support multiple clients yet :(\n");
+				// Implicitly ignore the packet until the client times out.
+			}
+			
 			break;
+		}
 		case PACKET_WRQ:
 			printf("Got write request packet\n");
-			Error(client, ERROR_UNDEFINED, "Operation not supported.");
+			Error(client, ERROR_UNDEFINED, "Operation not yet supported.");
 			break;
 		case PACKET_RRQ:
 		{
@@ -139,34 +184,49 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
 			const char *mode = ((const char *)p) + (sizeof(uint16_t) + strlen(filename) + 1);
-
-                        char tmp[(1 << 16)];
-                        sprintf(tmp, "%s/%s", config->directory, filename);
-
-                        if (!FileExists(tmp))
-                        {
-                                Error(client, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
-                        }
-
-                        FILE *f = fopen(tmp, "rb");
-                        if (!f)
-                        {
-                                fprintf(stderr, "Failed to open file %s for sending\n", tmp);
-                                Error(client, ERROR_UNDEFINED, "Internal error");
-                                return;
-                        }
-
-                        // file buffer
-                        uint8_t buf[512];
-                        memset(buf, 0, sizeof(buf));
-                        size_t readlen = fread(buf, 1, sizeof(buf), f);
-                        client.f = f;
-                        client.currentblockno = 1;
-                        client.sendingfile = 1;
-                        SendData(client, buf, readlen);
-
+			
 			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
+
+			// We don't support mail-mode
+			if (!strcasecmp(mode, "mail"))
+			{
+				Error(client, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
+				return;
+			}
+			
+			int imode = strcasecmp(mode, "netascii");
+
+			char tmp[(1 << 16)];
+			sprintf(tmp, "%s/%s", config->directory, filename);
+
+			if (!FileExists(tmp))
+				Error(client, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
+
+			FILE *f = fopen(tmp, (imode == 0 ? "rt" : "rb"));
+			if (!f)
+			{
+				fprintf(stderr, "Failed to open file %s for sending: %s\n", tmp, strerror(errno));
+				Error(client, ERROR_UNDEFINED, "Cannot open file: %s", strerror(errno));
+				return;
+			}
+			
+			printf("File \"%s\" is available, sending first packet\n", tmp);
+
+			// file buffer
+			uint8_t buf[512];
+			memset(buf, 0, sizeof(buf));
+			size_t readlen = fread(buf, 1, sizeof(buf), f);
+			client.f = f;
+			client.currentblockno = 1;
+			client.sendingfile = 1;
+			SendData(client, buf, readlen);
+			
+			// Copy the client structure.
+			currentclient = malloc(sizeof(client_t));
+			memcpy(currentclient, &client, sizeof(client_t));
+
+			
 			break;
                 }
 		default:
@@ -252,9 +312,6 @@ int main(int argc, char **argv)
 		
 		// Process the packet received.
 		ProcessPacket(c, buf, recvlen);
-		
-		// Send an error packet for the timebeing.
-		Error(c, ERROR_NOFILE, "Nothing is implemented! But it works! :D");
 	}
 	
 	// Close the file descriptor.
