@@ -36,8 +36,8 @@ int ParseConfig(const char *filename)
         yyin = fd;
 
         int ret = yyparse();
-        fclose(fd);
         yylex_destroy();
+	fclose(fd);
 	
 	
 	printf("Config:\n");
@@ -87,6 +87,7 @@ void DeallocateConfig(config_t *conf)
 	if (conf->group)
 		free(conf->group);
 	
+	free(conf->directory);
 	free(conf);
 }
 

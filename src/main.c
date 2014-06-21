@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <assert.h>
 
 #include "packets.h"
 #include "config.h"
@@ -103,10 +104,10 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 		Error(client, ERROR_ILLEGAL, "Invalid packet size");
 		return;
 	}
+	
+	assert(buffer);
 
-	packet_t *p = malloc(len);
-	memset(p, 0, len);
-	memcpy(p, buffer, len);
+	const packet_t *p = buffer;
 	
 	switch(ntohs(p->opcode))
 	{
@@ -214,7 +215,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			if (!strcasecmp(mode, "mail"))
 			{
 				Error(client, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
-				return;
+				break;
 			}
 			
 			int imode = strcasecmp(mode, "netascii");
@@ -230,7 +231,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			{
 				fprintf(stderr, "Failed to open file %s for sending: %s\n", tmp, strerror(errno));
 				Error(client, ERROR_UNDEFINED, "Cannot open file: %s", strerror(errno));
-				return;
+				break;
 			}
 			
 			printf("File \"%s\" is available, sending first packet\n", tmp);
@@ -257,8 +258,6 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			//Error(client, ERROR_ILLEGAL, "Unknown packet");
 			break;
 	}
-	
-	free(p);
 }
 
 int main(int argc, char **argv)

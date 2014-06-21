@@ -64,7 +64,7 @@ server_port: PORT '=' CINT ';'
 
 server_directory: DIRECTORY '=' STR ';'
 {
-	config->directory = yylval.sval;
+	config->directory = strdup(yylval.sval);
 };
 
 server_user: USER '=' STR ';'
@@ -74,7 +74,7 @@ server_user: USER '=' STR ';'
 
 server_group: GROUP '=' STR ';'
 {
-	config->user = strdup(yylval.sval);
+	config->group = strdup(yylval.sval);
 };
 
 
