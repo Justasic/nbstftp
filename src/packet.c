@@ -88,7 +88,8 @@ void Acknowledge(client_t client, uint16_t blockno)
 	}
 }
 
-void Error(client_t client, const uint16_t errnum, const char *str)
+__attribute__((format(printf, 3, 4)))
+void Error(client_t client, const uint16_t errnum, const char *str, ...)
 {
 	//
 	//     2 bytes     2 bytes      string    1 byte
@@ -96,7 +97,17 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	//     | Opcode |  ErrorCode |   ErrMsg   |   0  |
 	//     -------------------------------------------
 	//
+        
 	size_t len = strlen(str);
+
+        char *buf = malloc(len*2);
+        va_list ap;
+        va_start(ap, str);
+        vsnprintf(buf, len*2, str, ap);
+        va_end(ap);
+
+        len = strlen(buf);
+        buf = realloc(buf, len);
 	
 	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)
 	{
@@ -111,7 +122,7 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	// Fancy casting magic!
 	uint8_t *pptr = (uint8_t*)p;
 	pptr += sizeof(packet_t);
-	strncpy((char*)pptr, str, len);
+	strncpy((char*)pptr, buf, len);
 	// guaranteed null-termination.
 	pptr[len] = 0;
 
@@ -125,4 +136,5 @@ void Error(client_t client, const uint16_t errnum, const char *str)
 	
 	// Free our packet.
 	free(p);
+        free(buf);
 }
