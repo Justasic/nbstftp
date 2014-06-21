@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 		case 1: // Success.
 			break;
 		case 0:
-			printf("Invalid ipv4 bind address: %s\n", config->bindaddr);
+			fprintf(stderr, "Invalid ipv4 bind address: %s\n", config->bindaddr);
 			return EXIT_FAILURE;
 		default:
 			perror("inet_pton");
