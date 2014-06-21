@@ -125,6 +125,28 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			
 			// Send an Acknowledgement packet.
 			Acknowledge(client, 1);
+			
+			// For whatever reason, BIOSes send a WRQ packet to verify the
+			// file exists and then cancels immediately upon receiving the
+			// first packet. This makes the server freak the fuck out and
+			// do things wrong. So here we deallocate if we run into any
+			// kind of error.
+			
+			// Deallocate our client if it was the current client
+			char *addr1 = inet_ntoa(client.addr.in.sin_addr), *addr2 = NULL;
+			
+			if (currentclient)
+				addr2 = inet_ntoa(currentclient->addr.in.sin_addr);
+			
+			if (strcmp(addr1, addr2) == 0)
+			{
+				printf("Aborting file transfer.\n");
+				// Close the file and clean up.
+				fclose(currentclient->f);
+				free(currentclient);
+				currentclient = NULL;
+			}
+			
 			break;
 		}
 		case PACKET_ACK:
