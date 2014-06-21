@@ -121,6 +121,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 		}
 		case PACKET_ACK:
 			printf("Got Acknowledgement packet for block %d\n", ntohs(p->blockno));
+                        if (client.)
 			break;
 		case PACKET_WRQ:
 			printf("Got write request packet\n");
@@ -138,6 +139,32 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
 			const char *mode = ((const char *)p) + (sizeof(uint16_t) + strlen(filename) + 1);
+
+                        char tmp[(1 << 16)];
+                        sprintf(tmp, "%s/%s", config->directory, filename);
+
+                        if (!FileExists(tmp))
+                        {
+                                Error(client, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
+                        }
+
+                        FILE *f = fopen(tmp, "rb");
+                        if (!f)
+                        {
+                                fprintf(stderr, "Failed to open file %s for sending\n", tmp);
+                                Error(client ERROR_UNDEFINED, "Internal error");
+                                return;
+                        }
+
+                        // file buffer
+                        uint8_t buf[512];
+                        memset(buf, 0, sizeof(buf));
+                        size_t readlen = fread(buf, 1, sizeof(buf), f);
+                        client.f = f;
+                        client.currentblockno = 1;
+                        client.sendingfile = 1;
+                        SendData(client, buf, readlen);
+
 			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
 			break;

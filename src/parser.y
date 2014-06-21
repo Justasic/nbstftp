@@ -49,7 +49,7 @@ server_entry: SERVER
 '{' server_items '}';
 
 server_items: | server_item server_items;
-server_item: server_bind | server_port | server_directory | server_user | server_group | server_daemonize;
+server_item: server_bind | server_port | server_directory | server_user | server_group | server_daemonize | server_pidfile;
 
 
 server_bind: BIND '=' STR ';'
