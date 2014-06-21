@@ -28,6 +28,9 @@ server
         // Group to run the daemon as (default is also to remain as executing user)
         //group = "somegroup";
 
+        // PID file location (defaults to /var/run/nbstftp.pid)
+        //pidfile = "/tmp/nbstftp.pid"
+
         // Whether or not to daemonize to the background (default is true)
         //daemonize = true;
 }

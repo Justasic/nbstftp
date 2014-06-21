@@ -23,14 +23,13 @@ group         { return GROUP; }
 pidfile       { return PIDFILE; }
 daemonize     { return DAEMONIZE; }
 
-
  /* Ignore white space */
 [ \t]                 { }
 \n                    { ++lineno; }
 [0-9]+                { yylval.ival = atoi(yytext); return CINT; }
 \"[^\"\n]*[\"\n]      { yytext[yyleng - 1] = 0; yylval.sval = yytext + 1; return STR; }
-true|yes              { yylval.bval = 1; }
-false|no              { yylval.bval = 0; }
+true|yes              { yylval.bval = 1; return BOOL; }
+false|no              { yylval.bval = 0; return BOOL; }
 "/*"                  { BEGIN(COMMENT); commentstart = lineno; }
 <COMMENT>"*/"         { BEGIN(INITIAL); }
 <COMMENT>([^*]|\n)+|. { ++lineno; }

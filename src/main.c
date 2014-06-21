@@ -121,7 +121,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 		}
 		case PACKET_ACK:
 			printf("Got Acknowledgement packet for block %d\n", ntohs(p->blockno));
-                        if (client.)
+//                         if (client.)
 			break;
 		case PACKET_WRQ:
 			printf("Got write request packet\n");
@@ -152,7 +152,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
                         if (!f)
                         {
                                 fprintf(stderr, "Failed to open file %s for sending\n", tmp);
-                                Error(client ERROR_UNDEFINED, "Internal error");
+                                Error(client, ERROR_UNDEFINED, "Internal error");
                                 return;
                         }
 
