@@ -22,9 +22,17 @@ typedef struct client_s
 {
 	socketstructs_t addr;
 	int fd;
+        // Status variables
 	uint16_t currentblockno;
         uint8_t gotack, sendingfile;
+
+        // The last packet of data we sent.
+        packet_t *lpacket;
+        size_t lpacketlen;
+
+        // Current file we're sending
         FILE *f;
+        // Next and previous clients
 	struct client_s *next, *prev;
 } client_t;
 
@@ -36,3 +44,6 @@ extern void RemoveClient(client_t *c);
 extern int CompareClients(client_t *c1, client_t *c2);
 // Find a client based on their socket structure.
 extern client_t *FindClient(socketstructs_t sa);
+// Either find a client or allocate a new one, also adds it to the linked list.
+extern client_t *FindOrAllocateClient(socketstructs_t sa, int fd);
+

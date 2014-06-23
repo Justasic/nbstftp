@@ -27,20 +27,19 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <assert.h>
+#include "client.h"
 
-void SendData(client_t client, void *data, size_t len)
+void SendData(client_t *c, void *data, size_t len)
 {
 	// Make sure the packet size does not exceed the max packet length.
-	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)
-	{
-		printf("Cannot copy %lu bytes into DATA packet: packet too large!\n", (unsigned long)len + sizeof(packet_t));
-		exit(EXIT_FAILURE);
-	}
+        assert((len + sizeof(packet_t) <= MAX_PACKET_SIZE));
+        assert(c);
 	
 	// Allocate a packet that is as big as the data + len
 	packet_t *p = malloc(len + sizeof(packet_t));
 	p->opcode   = htons(PACKET_DATA);
-	p->blockno  = htons(client.currentblockno++);
+	p->blockno  = htons(c->currentblockno);
 	
 	// Cast the pointer, move to the end of the struct,
 	// then copy our data, this will mean we have a full
@@ -51,24 +50,22 @@ void SendData(client_t client, void *data, size_t len)
 	//     | Opcode |   Block #  |   Data   |
 	//     ----------------------------------
 	//
-	uint8_t *pptr = (uint8_t*)p;
-	pptr += sizeof(packet_t);
+	uint8_t *pptr = ((uint8_t*)p) + sizeof(packet_t);
 	memcpy(pptr, data, len);
 	
-	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, p, len + sizeof(packet_t), 0, &client.addr.sa, socklen);
+	int sendlen = sendto(c->fd, p, len + sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.in));
 	if (sendlen == -1)
 	{
 		perror("sendto failed");
-		exit(EXIT_FAILURE);
 	}
 	
 	// Free our packet.
 	free(p);
 }
 
-void Acknowledge(client_t client, uint16_t blockno)
+void Acknowledge(client_t *c, uint16_t blockno)
 {
+        assert(c);
 	//
 	//     2 bytes     2 bytes
 	//     -----------------------
@@ -79,17 +76,15 @@ void Acknowledge(client_t client, uint16_t blockno)
 	p.opcode = htons(PACKET_ACK);
 	p.blockno = htons(blockno);
 	
-	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, &p, sizeof(packet_t), 0, &client.addr.sa, socklen);
+	int sendlen = sendto(c->fd, &p, sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.sa));
 	if (sendlen == -1)
 	{
 		perror("sendto failed");
-		exit(EXIT_FAILURE);
 	}
 }
 
 __attribute__((format(printf, 3, 4)))
-void Error(client_t client, const uint16_t errnum, const char *str, ...)
+void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 {
 	//
 	//     2 bytes     2 bytes      string    1 byte
@@ -97,6 +92,8 @@ void Error(client_t client, const uint16_t errnum, const char *str, ...)
 	//     | Opcode |  ErrorCode |   ErrMsg   |   0  |
 	//     -------------------------------------------
 	//
+
+        assert(c);
         
 	size_t len = strlen(str);
 
@@ -107,32 +104,31 @@ void Error(client_t client, const uint16_t errnum, const char *str, ...)
         va_end(ap);
 
         len = strlen(buf);
-        buf = realloc(buf, len);
+        buf = realloc(buf, len+1);
 	
-	if ((len + sizeof(packet_t)) > MAX_PACKET_SIZE)
-	{
-		printf("Cannot copy %lu bytes into ERROR packet: packet too large!\n",  (unsigned long)len + sizeof(packet_t));
-		exit(EXIT_FAILURE);
-	}
-	
+        // If your message is seriously bigger than 512 characters
+        // then you need to rethink what is going on.
+        // The end user doesn't need a god damn book because a file
+        // doesn't exist or some shit.
+        assert((len + sizeof(packet_t)) <= MAX_PACKET_SIZE);
+
 	packet_t *p = malloc(len + sizeof(packet_t) + 1);
 	p->opcode   = htons(PACKET_ERROR);
 	p->blockno  = htons(errnum);
 	
 	// Fancy casting magic!
-	uint8_t *pptr = (uint8_t*)p;
-	pptr += sizeof(packet_t);
+	uint8_t *pptr = ((uint8_t*)p) + sizeof(packet_t);
 	strncpy((char*)pptr, buf, len);
 	// guaranteed null-termination.
 	pptr[len] = 0;
 
-	socklen_t socklen = sizeof(client.addr.in);
-	int sendlen = sendto(client.fd, p, len + sizeof(packet_t) + 1, 0, &client.addr.sa, socklen);
+	socklen_t socklen = sizeof(c->addr.in);
+	int sendlen = sendto(c->fd, p, len + sizeof(packet_t) + 1, 0, &c->addr.sa, socklen);
 	if (sendlen == -1)
 	{
 		perror("sendto failed");
-		exit(EXIT_FAILURE);
 	}
+
 	
 	// Free our packet.
 	free(p);

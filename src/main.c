@@ -33,6 +33,7 @@
 #include "config.h"
 #include "commandline.h"
 #include "filesystem.h"
+#include "client.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
@@ -92,16 +93,13 @@ write:
 	fclose(f);
 }
 
-// FIXME: make a better version of this.
-client_t *currentclient;
-
 // Process the incoming packet.
-void ProcessPacket(client_t client, void *buffer, size_t len)
+void ProcessPacket(client_t *c, void *buffer, size_t len)
 {
 	// Sanity check
 	if (len > MAX_PACKET_SIZE)
 	{
-		Error(client, ERROR_ILLEGAL, "Invalid packet size");
+		Error(c, ERROR_ILLEGAL, "Invalid packet size");
 		return;
 	}
 	
@@ -125,7 +123,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 			
 			// Send an Acknowledgement packet.
-			Acknowledge(client, 1);
+			Acknowledge(c, 1);
 			
 			// For whatever reason, BIOSes send a WRQ packet to verify the
 			// file exists and then cancels immediately upon receiving the
@@ -133,67 +131,46 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// do things wrong. So here we deallocate if we run into any
 			// kind of error.
 			
-			// Deallocate our client if it was the current client
-			char *addr1 = inet_ntoa(client.addr.in.sin_addr), *addr2 = NULL;
-			
-			if (currentclient)
-				addr2 = inet_ntoa(currentclient->addr.in.sin_addr);
-			
-			if (strcmp(addr1, addr2) == 0)
-			{
+                        if (c->sendingfile)
+                        {
 				printf("Aborting file transfer.\n");
 				// Close the file and clean up.
-				fclose(currentclient->f);
-				free(currentclient);
-				currentclient = NULL;
+				fclose(c->f);
+				RemoveClient(c);
 			}
 			
 			break;
 		}
 		case PACKET_ACK:
 		{
-			char *addr1 = inet_ntoa(client.addr.in.sin_addr), *addr2 = NULL;
-			
-			if (currentclient)
-				addr2 = inet_ntoa(currentclient->addr.in.sin_addr);
-			
+			char *addr1 = inet_ntoa(c->addr.in.sin_addr);
 			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
 			
-			if (!addr2)
-				break;
-			
-			if (strcmp(addr1, addr2) == 0)
-			{
-				uint8_t buf[512];
-				memset(buf, 0, sizeof(buf));
-				size_t readlen = fread(buf, 1, sizeof(buf), currentclient->f);
-				
-				
-				currentclient->currentblockno++;
-				// We're at the end of the file.
-				if (MIN(512, readlen) != 512)
-				{
-					SendData(*currentclient, buf, readlen);
-					printf("Finished sending file\n");
-					// Close the file and clean up.
-					fclose(currentclient->f);
-					free(currentclient);
-					currentclient = NULL;
-					break;
-				}
-				SendData(*currentclient, buf, readlen);
-			}
-			else
-			{
-				printf("Uh-oh. We can't support multiple clients yet :(\n");
-				// Implicitly ignore the packet until the client times out.
-			}
-			
+                        if (c->sendingfile)
+                        {
+                                uint8_t buf[512];
+                                memset(buf, 0, sizeof(buf));
+                                size_t readlen = fread(buf, 1, sizeof(buf), c->f);
+                                
+                                c->currentblockno++;
+                                // We're at the end of the file.
+                                if (MIN(512, readlen) != 512)
+                                {
+                                        SendData(c, buf, readlen);
+                                        printf("Finished sending file\n");
+                                        // Close the file and clean up.
+                                        fclose(c->f);
+                                        RemoveClient(c);
+                                        break;
+                                }
+                                SendData(c, buf, readlen);
+                        }
+
 			break;
 		}
 		case PACKET_WRQ:
 			printf("Got write request packet\n");
-			Error(client, ERROR_UNDEFINED, "Operation not yet supported.");
+			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
 			break;
 		case PACKET_RRQ:
 		{
@@ -214,7 +191,7 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			// We don't support mail-mode
 			if (!strcasecmp(mode, "mail"))
 			{
-				Error(client, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
+				Error(c, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
 				break;
 			}
 			
@@ -224,13 +201,13 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			sprintf(tmp, "%s/%s", config->directory, filename);
 
 			if (!FileExists(tmp))
-				Error(client, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
+				Error(c, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
 
 			FILE *f = fopen(tmp, (imode == 0 ? "rt" : "rb"));
 			if (!f)
 			{
 				fprintf(stderr, "Failed to open file %s for sending: %s\n", tmp, strerror(errno));
-				Error(client, ERROR_UNDEFINED, "Cannot open file: %s", strerror(errno));
+				Error(c, ERROR_NOFILE, "Cannot open file: %s", strerror(errno));
 				break;
 			}
 			
@@ -240,22 +217,17 @@ void ProcessPacket(client_t client, void *buffer, size_t len)
 			uint8_t buf[512];
 			memset(buf, 0, sizeof(buf));
 			size_t readlen = fread(buf, 1, sizeof(buf), f);
-			client.f = f;
-			client.currentblockno = 1;
-			client.sendingfile = 1;
-			SendData(client, buf, readlen);
-			
-			// Copy the client structure.
-			currentclient = malloc(sizeof(client_t));
-			memcpy(currentclient, &client, sizeof(client_t));
-
+			c->f = f;
+			c->currentblockno = 1;
+			c->sendingfile = 1;
+			SendData(c, buf, readlen);
 			
 			break;
                 }
 		default:
 			printf("Got unknown packet: %d\n", ntohs(p->opcode));
 			// Unknown packets are ignored according to the RFC.
-			//Error(client, ERROR_ILLEGAL, "Unknown packet");
+			//Error(c, ERROR_ILLEGAL, "Unknown packet");
 			break;
 	}
 }
@@ -321,15 +293,14 @@ int main(int argc, char **argv)
 	while (running)
 	{
 		printf("Waiting on port %d\n", port);
-		client_t c;
-		// Clear our client struct
-		memset(&c, 0, sizeof(client_t));
-		socklen_t addrlen = sizeof(c.addr);
 		
-		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &c.addr.sa, &addrlen);
- 		c.fd = fd;
+                socketstructs_t addr;
+		socklen_t addrlen = sizeof(socketstructs_t);
+		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &addr.sa, &addrlen);
+
+                client_t *c = FindOrAllocateClient(addr, fd);
 		
-		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c.addr.in.sin_addr));
+		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c->addr.in.sin_addr));
 		
 		// Process the packet received.
 		ProcessPacket(c, buf, recvlen);
