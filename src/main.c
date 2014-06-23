@@ -34,6 +34,7 @@
 #include "commandline.h"
 #include "filesystem.h"
 #include "client.h"
+#include "misc.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
@@ -71,10 +72,7 @@ void WritePID(void)
 		
 		// Check if the process is running.
 		if (kill(pid, 0) == 0)
-		{
-			fprintf(stderr, "A nbstftp daemon is already running!\n");
-			exit(EXIT_FAILURE);
-		}
+			die("A nbstftp daemon is already running!");
 		else
 		{
 			printf("Removing stale pid file %s\n", config->pidfile);
@@ -99,7 +97,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	// Sanity check
 	if (len > MAX_PACKET_SIZE)
 	{
-		Error(c, ERROR_ILLEGAL, "Invalid packet size");
+// 		Error(c, ERROR_ILLEGAL, "Invalid packet size");
+		printf("Received an invalidly sized packet.\n");
 		return;
 	}
 	
@@ -264,8 +263,7 @@ int main(int argc, char **argv)
 		case 1: // Success.
 			break;
 		case 0:
-			fprintf(stderr, "Invalid ipv4 bind address: %s\n", config->bindaddr);
-			return EXIT_FAILURE;
+			die("Invalid ipv4 bind address: %s", config->bindaddr);
 		default:
 			perror("inet_pton");
 			return EXIT_FAILURE;

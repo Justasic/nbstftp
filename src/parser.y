@@ -1,7 +1,10 @@
 %{
 #include "config.h"
+#include "misc.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 extern int yylex();
 extern void yyerror(const char *s);
@@ -40,8 +43,7 @@ conf_items: server_entry;
 
 server_entry: SERVER
 {
-	config = malloc(sizeof(config_t));
-	memset(config, 0, sizeof(config_t));
+	config = nmalloc(sizeof(config_t));
 	// Defaults
 	config->port = -1;
 	config->daemonize = 1;
@@ -55,6 +57,11 @@ server_item: server_bind | server_port | server_directory | server_user | server
 server_bind: BIND '=' STR ';'
 {
 	config->bindaddr = strdup(yylval.sval);
+	if (!config->bindaddr)
+	{
+		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
+		exit(1);
+	}
 };
 
 server_port: PORT '=' CINT ';'
@@ -65,16 +72,31 @@ server_port: PORT '=' CINT ';'
 server_directory: DIRECTORY '=' STR ';'
 {
 	config->directory = strdup(yylval.sval);
+	if (!config->directory)
+	{
+		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
+		exit(1);
+	}
 };
 
 server_user: USER '=' STR ';'
 {
 	config->user = strdup(yylval.sval);
+	if (!config->user)
+	{
+		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
+		exit(1);
+	}
 };
 
 server_group: GROUP '=' STR ';'
 {
 	config->group = strdup(yylval.sval);
+	if (!config->group)
+	{
+		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
+		exit(1);
+	}
 };
 
 
@@ -86,4 +108,9 @@ server_daemonize: DAEMONIZE '=' BOOL ';'
 server_pidfile: PIDFILE '=' STR ';'
 {
 	config->pidfile = strdup(yylval.sval);
+	if (!config->pidfile)
+	{
+		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
+		exit(1);
+	}
 };

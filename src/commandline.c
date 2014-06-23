@@ -14,6 +14,7 @@
  */
 #include "commandline.h"
 #include "LICENSE.h"
+#include "misc.h"
 #include <stdio.h>
 #include <strings.h>
 #include <string.h>
@@ -38,9 +39,9 @@ static void PrintHelp(void)
 
 static void PrintLicense(void)
 {
-	// Print the license header.
-	char *str = malloc(LICENSE_len+1);
-	memcpy(str, LICENSE, LICENSE_len);
+	// Print the license header. We have to allocate due to
+	// no null terminator.
+	char *str = nmalloc(LICENSE_len+1);
 	str[LICENSE_len+1] = 0;
 	fprintf(stderr, "%s", str);
 	free(str);

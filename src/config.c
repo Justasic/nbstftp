@@ -15,6 +15,7 @@
 
 #include "config.h"
 #include "parser.h"
+#include "misc.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -28,10 +29,7 @@ int ParseConfig(const char *filename)
 {
         FILE *fd = fopen(filename, "r");
         if (!fd)
-        {
-                fprintf(stderr, "Failed to open config file: %s\n", filename);
-                exit(EXIT_FAILURE);
-        }
+		die("Failed to open config file: %s", filename);
 
         yyin = fd;
 
@@ -39,7 +37,7 @@ int ParseConfig(const char *filename)
         yylex_destroy();
 	fclose(fd);
 	
-	
+#ifndef NDEBUG
 	printf("Config:\n");
 	if (config)
 		printf(" Bind: %s\n Port: %d\n Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n",
@@ -47,18 +45,13 @@ int ParseConfig(const char *filename)
 	 config->daemonize);
 	else
 		printf("Config is null!\n");
+#endif
 	
 	if (!config)
-	{
-		fprintf(stderr, "Failed to parse config file!\n");
-		exit(EXIT_FAILURE);
-	}
+		die("Failed to parse config file!");
 	
 	if (!config->directory)
-	{
-		fprintf(stderr, "You must specify a directory to serve files from in the config!\n");
-		exit(EXIT_FAILURE);
-	}
+		die("You must specify a directory to serve files from in the config!");
 	
 	// Default is to listen on all interfaces
 	if (!config->bindaddr)

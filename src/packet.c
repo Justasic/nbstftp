@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <assert.h>
 #include "client.h"
+#include <misc.h>
 
 void SendData(client_t *c, void *data, size_t len)
 {
@@ -37,7 +38,7 @@ void SendData(client_t *c, void *data, size_t len)
         assert(c);
 	
 	// Allocate a packet that is as big as the data + len
-	packet_t *p = malloc(len + sizeof(packet_t));
+	packet_t *p = nmalloc(len + sizeof(packet_t));
 	p->opcode   = htons(PACKET_DATA);
 	p->blockno  = htons(c->currentblockno);
 	
@@ -55,9 +56,7 @@ void SendData(client_t *c, void *data, size_t len)
 	
 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.in));
 	if (sendlen == -1)
-	{
 		perror("sendto failed");
-	}
 	
 	// Free our packet.
 	free(p);
@@ -97,7 +96,7 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
         
 	size_t len = strlen(str);
 
-        char *buf = malloc(len*2);
+        char *buf = nmalloc(len*2);
         va_list ap;
         va_start(ap, str);
         vsnprintf(buf, len*2, str, ap);
@@ -112,7 +111,7 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
         // doesn't exist or some shit.
         assert((len + sizeof(packet_t)) <= MAX_PACKET_SIZE);
 
-	packet_t *p = malloc(len + sizeof(packet_t) + 1);
+	packet_t *p = nmalloc(len + sizeof(packet_t) + 1);
 	p->opcode   = htons(PACKET_ERROR);
 	p->blockno  = htons(errnum);
 	
@@ -125,11 +124,8 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	socklen_t socklen = sizeof(c->addr.in);
 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t) + 1, 0, &c->addr.sa, socklen);
 	if (sendlen == -1)
-	{
 		perror("sendto failed");
-	}
 
-	
 	// Free our packet.
 	free(p);
         free(buf);
