@@ -35,6 +35,7 @@
 #include "filesystem.h"
 #include "client.h"
 #include "misc.h"
+#include "signalhandler.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
@@ -145,25 +146,26 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			char *addr1 = inet_ntoa(c->addr.in.sin_addr);
 			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
 			
-                        if (c->sendingfile)
-                        {
-                                uint8_t buf[512];
-                                memset(buf, 0, sizeof(buf));
-                                size_t readlen = fread(buf, 1, sizeof(buf), c->f);
-                                
-                                c->currentblockno++;
-                                // We're at the end of the file.
-                                if (MIN(512, readlen) != 512)
-                                {
-                                        SendData(c, buf, readlen);
-                                        printf("Finished sending file\n");
-                                        // Close the file and clean up.
-                                        fclose(c->f);
-                                        RemoveClient(c);
-                                        break;
-                                }
-                                SendData(c, buf, readlen);
-                        }
+			if (c->sendingfile)
+			{
+				printf("Client is sending file\n");
+				uint8_t buf[512];
+				memset(buf, 0, sizeof(buf));
+				size_t readlen = fread(buf, 1, sizeof(buf), c->f);
+				
+				c->currentblockno++;
+				// We're at the end of the file.
+				if (MIN(512, readlen) != 512)
+				{
+					SendData(c, buf, readlen);
+					printf("Finished sending file\n");
+					// Close the file and clean up.
+					fclose(c->f);
+					RemoveClient(c);
+					break;
+				}
+				SendData(c, buf, readlen);
+			}
 
 			break;
 		}
@@ -234,12 +236,16 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 int main(int argc, char **argv)
 {
 	HandleArguments(argc, argv);
+	
+	RegisterSignalHandlers();
 
 	if (!configfile)
 		configfile = "nbstftp.conf";
 
-	ParseConfig(configfile);
-	
+	if (ParseConfig(configfile) != 0)
+		die("FATAL: Failed to parse the config file!");
+
+
 	socketstructs_t myaddr;
 	int recvlen, fd;
 	unsigned char buf[MAX_PACKET_SIZE];
@@ -295,6 +301,12 @@ int main(int argc, char **argv)
                 socketstructs_t addr;
 		socklen_t addrlen = sizeof(socketstructs_t);
 		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &addr.sa, &addrlen);
+
+		// The kernel either told us that we need to read again
+		// or we received a signal and are continuing from where
+		// we left off.
+		if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
+			continue;
 
                 client_t *c = FindOrAllocateClient(addr, fd);
 		

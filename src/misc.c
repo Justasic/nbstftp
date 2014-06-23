@@ -45,6 +45,8 @@ void die(const char *msg, ...)
 
 // Our own error checking and nullification malloc.
 // the __attribute__ is to tell gcc that this function is malloc-like
+// so it can optimize calls to this function (which should always return
+// a pointer. if an error condition happens, it terminates here and now.)
 __attribute__((malloc))
 void *nmalloc(size_t sz)
 {

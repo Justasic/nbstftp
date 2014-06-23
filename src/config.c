@@ -29,7 +29,10 @@ int ParseConfig(const char *filename)
 {
         FILE *fd = fopen(filename, "r");
         if (!fd)
-		die("Failed to open config file: %s", filename);
+	{
+		fprintf(stderr, "Failed to open config file %s: %s\n", filename, strerror(errno));
+		return 1;
+	}
 
         yyin = fd;
 
@@ -44,14 +47,21 @@ int ParseConfig(const char *filename)
 		       config->bindaddr, config->port, config->directory, config->user, config->group,
 	 config->daemonize);
 	else
-		printf("Config is null!\n");
+		printf(" Config is null!\n");
 #endif
 	
 	if (!config)
-		die("Failed to parse config file!");
+	{
+		fprintf(stderr, "Failed to parse config file!\n");
+		return 1;
+	}
 	
 	if (!config->directory)
-		die("You must specify a directory to serve files from in the config!");
+	{
+
+		fprintf(stderr, "You must specify a directory to serve files from in the config!");
+		return 1;
+	}
 	
 	// Default is to listen on all interfaces
 	if (!config->bindaddr)
