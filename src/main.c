@@ -43,7 +43,7 @@ int running = 1;
 short port = -1;
 
 // Fork to background unless otherwise specified
-int nofork = 0;
+int nofork = -1;
 // int ipv4_only = 0;
 // int ipv6_only = 0;
 char *configfile = NULL;
@@ -297,6 +297,10 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 	
+	if (nofork == -1)
+		nofork = !config->daemonize;
+	// Go away.
+	Daemonize();
 	
 	// Enter idle loop.
 	while (running)

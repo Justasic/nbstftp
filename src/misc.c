@@ -128,3 +128,36 @@ int SwitchUserAndGroup(const char *user, const char *group)
 	
 	return 0;
 }
+
+int InTerm(void)
+{
+	return isatty(fileno(stdout) && isatty(fileno(stdin)) && isatty(fileno(stderr)));
+}
+
+// Daemonize (aka. Fork)
+void Daemonize(void)
+{
+	extern int nofork;
+	if(!nofork && InTerm())
+	{
+		int i = fork();
+		
+		// Exit our parent process.
+		if(i > 0)
+			exit(EXIT_SUCCESS);
+		
+		// Say our PID to the console.
+		printf("Going away from console, pid: %d\n", getpid());
+		
+		// Close all the file descriptors so printf and shit goes
+		// away. This can later be used for logging instead.
+		freopen("/dev/null", "r", stdin);
+		freopen("/dev/null", "w", stdout);
+		freopen("/dev/null", "w", stderr);
+		
+		if(setpgid(0, 0) < 0)
+			die("Unable to setpgid()");
+		else if(i == -1)
+			die("Unable to daemonize");
+	}
+}

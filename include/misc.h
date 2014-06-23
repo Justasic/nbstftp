@@ -22,3 +22,5 @@ extern __attribute__((malloc)) void *nmalloc(size_t sz);
 extern void die(const char *, ...) __attribute__ ((noreturn));
 
 extern int SwitchUserAndGroup(const char *user, const char *group);
+
+extern void Daemonize(void);
