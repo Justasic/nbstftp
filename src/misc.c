@@ -14,10 +14,15 @@
  */
 
 #include "misc.h"
+#define _POSIX_SOURCE
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <pwd.h>    // For /etc/passwd related functions
+#include <grp.h>    // For /etc/group related functions
+#include <unistd.h>
+#include <sys/types.h>
 
 void die(const char *msg, ...)
 {
@@ -65,4 +70,61 @@ void *nmalloc(size_t sz)
 	
 	// bye!
 	return ptr;
+}
+
+// Change userid and groupid to this user.
+int SwitchUserAndGroup(const char *user, const char *group)
+{
+	// It is not a failure to have both user and group null.
+	// It simply means do nothing.
+	if (!user && !group)
+		return 0;
+	
+	if (user)
+	{
+		errno = 0;
+		struct passwd *pass = getpwnam(user);
+		if (!pass)
+		{
+			fprintf(stderr, "Cannot getpwnam %s: %s\n", user, strerror(errno));
+			return 1;
+		}
+		
+		if (setuid(pass->pw_uid) == -1)
+		{
+			fprintf(stderr, "Cannot setuid to %s: %s\n", user, strerror(errno));
+			return 1;
+		}
+		
+		// Save on one syscall at least.
+		if (group && !strcmp(user, group))
+		{
+			errno = 0;
+			if (setgid(pass->pw_gid) == -1)
+			{
+				fprintf(stderr, "Cannot setgid to %s: %s\n", group, strerror(errno));
+				return 1;
+			}
+			return 0;
+		}
+	}
+	
+	if (group)
+	{
+		errno = 0;
+		struct group *grp = getgrnam(group);
+		if (!grp)
+		{
+			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
+			return 1;
+		}
+		
+		if (setgid(grp->gr_gid) == -1)
+		{
+			fprintf(stderr, "Cannot setgid to %s: %s\n", group, strerror(errno));
+			return 1;
+		}
+	}
+	
+	return 0;
 }

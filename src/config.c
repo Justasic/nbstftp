@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 extern FILE *yyin;
 extern int yyparse();
@@ -80,6 +81,9 @@ int ParseConfig(const char *filename)
 
 void DeallocateConfig(config_t *conf)
 {
+	if (!config)
+		return; 
+	
 	// Clear memory.
 	if (conf->bindaddr)
 		free(conf->bindaddr);

@@ -20,3 +20,5 @@ extern __attribute__((malloc)) void *nmalloc(size_t sz);
 // tell the compiler that this kills the program so it can optimize
 // for it.
 extern void die(const char *, ...) __attribute__ ((noreturn));
+
+extern int SwitchUserAndGroup(const char *user, const char *group);

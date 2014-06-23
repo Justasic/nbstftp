@@ -287,10 +287,15 @@ int main(int argc, char **argv)
 	if (bind(fd, &myaddr.sa, sizeof(myaddr.sa)) < 0)
 	{
 		perror("bind failed");
-		return EXIT_FAILURE;
+		goto cleanup;
 	}
 	
 	// Change the user and group id.
+	if (SwitchUserAndGroup(config->user, config->group) == 1)
+	{
+		fprintf(stderr, "Failed to set user id or group id!\n");
+		goto cleanup;
+	}
 	
 	
 	// Enter idle loop.
@@ -307,6 +312,12 @@ int main(int argc, char **argv)
 		// we left off.
 		if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
 			continue;
+		else if (recvlen == -1)
+		{
+			fprintf(stderr, "FATAL: Received an error when reading from the socket: %s\n", strerror(errno));
+			running = 0;
+			continue;
+		}
 
                 client_t *c = FindOrAllocateClient(addr, fd);
 		
@@ -315,12 +326,15 @@ int main(int argc, char **argv)
 		// Process the packet received.
 		ProcessPacket(c, buf, recvlen);
 	}
+
+cleanup:
 	
 	// Close the file descriptor.
 	close(fd);
 	
 	// Remove our PID
-	unlink(config->pidfile);
+	if (config)
+		unlink(config->pidfile);
 
 	// Cleanup memory
 	DeallocateConfig(config);
