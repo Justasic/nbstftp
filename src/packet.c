@@ -96,10 +96,10 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
         
 	size_t len = strlen(str);
 
-        char *buf = nmalloc(len*2);
+        char *buf = nmalloc(len*len);
         va_list ap;
         va_start(ap, str);
-        vsnprintf(buf, len*2, str, ap);
+        len = vsnprintf(buf, len*len, str, ap);
         va_end(ap);
 
         len = strlen(buf);
