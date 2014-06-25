@@ -13,6 +13,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #define _POSIX_C_SOURCE 1
+#define _GNU_SOURCE 1
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -28,6 +29,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <assert.h>
+#include <alloca.h>
 
 #include "packets.h"
 #include "config.h"
@@ -118,8 +120,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		{
 			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
 			// to a const char * and send to printf.
-			// WARNING: This could buffer-overflow printf, need to use strlcpy or something safer.
-			const char *error = ((const char*)p) + sizeof(packet_t);
+			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 			
 			// Send an Acknowledgement packet.
@@ -176,15 +177,16 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		case PACKET_RRQ:
 		{
 			// Get the filename and modes
-			// WARNING: This needs to be fixed with proper length checking!
 			//
 			// Since we dig only past the first value in the struct, we only
 			// get the size of that first value (eg, the uint16_t)
-			const char *filename = ((const char *)p) + sizeof(uint16_t);
+			// Use strndupa to use the stack frame for temporary allocation with a
+			// max length of 512 bytes. This will prevent buffer-overflow exploits (or so I hope)
+			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
 			// This one is a bit weirder. We get the size of the uint16 like
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
-			const char *mode = ((const char *)p) + (sizeof(uint16_t) + strlen(filename) + 1);
+			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 			
 			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);

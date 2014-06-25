@@ -138,12 +138,12 @@ int InTerm(void)
 void Daemonize(void)
 {
 	extern int nofork;
-	if(!nofork && InTerm())
+	if (!nofork && InTerm())
 	{
 		int i = fork();
 		
 		// Exit our parent process.
-		if(i > 0)
+		if (i > 0)
 			exit(EXIT_SUCCESS);
 		
 		// Say our PID to the console.
@@ -155,9 +155,9 @@ void Daemonize(void)
 		freopen("/dev/null", "w", stdout);
 		freopen("/dev/null", "w", stderr);
 		
-		if(setpgid(0, 0) < 0)
+		if (setpgid(0, 0) < 0)
 			die("Unable to setpgid()");
-		else if(i == -1)
+		else if (i == -1)
 			die("Unable to daemonize");
 	}
 }
