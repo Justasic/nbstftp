@@ -113,6 +113,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	{
 		case PACKET_DATA:
 			printf("Got a data packet\n");
+            if ((len + sizeof(packet_t) > MAX_PACKET_SIZE)
+            {
+                    fprintf(stderr, "Received an oversided data packet! Terminating transfer.\n");
+                    Error(client, ERROR_ILLEGAL, "Sent an oversided packet.");
+            }
+
 			if ((len - sizeof(packet_t)) < 512)
 				printf("Got end of data packet?\n");
 			break;
@@ -171,7 +177,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			break;
 		}
 		case PACKET_WRQ:
-			printf("Got write request packet\n");
+			
+			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
+			
+			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			
+			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
 			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
 			break;
 		case PACKET_RRQ:
