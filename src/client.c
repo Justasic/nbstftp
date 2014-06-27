@@ -15,6 +15,7 @@
 // Recursive-include fix
 typedef struct client_s client_t;
 #include "client.h"
+#include "socket.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -42,16 +43,16 @@ void AddClient(client_t *c)
         end = c;
 }
 
-client_t *FindOrAllocateClient(socketstructs_t sa, int fd)
+client_t *FindOrAllocateClient(socket_t *s)
 {
-        client_t *found = FindClient(sa);
+        client_t *found = FindClient(s);
 
         if (!found)
         {
                 found = malloc(sizeof(client_t));
                 memset(found, 0, sizeof(client_t));
-                memcpy(&found->addr, &sa, sizeof(socketstructs_t));
-                found->fd = fd;
+                memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
+                found->s = s;
                 AddClient(found);
         }
 
@@ -82,28 +83,30 @@ int CompareClients(client_t *c1, client_t *c2)
 	assert(c1);
 	assert(c2);
 
-        assert(c1->addr.sa.sa_family == AF_INET ||
-                c1->addr.sa.sa_family == AF_INET6);
-        assert(c2->addr.sa.sa_family == AF_INET ||
-                c2->addr.sa.sa_family == AF_INET6);
+	assert(c1->s->addr.sa.sa_family == AF_INET ||
+		c1->s->addr.sa.sa_family == AF_INET6);
+	assert(c2->s->addr.sa.sa_family == AF_INET ||
+		c2->s->addr.sa.sa_family == AF_INET6);
+	
+	socket_t *s1 = c1->s, *s2 = c2->s;
 
         // First, compare address types, if they're not a match then
         // obviously the clients are very different.
-        if (c1->addr.sa.sa_family != c2->addr.sa.sa_family)
+	if (s1->addr.sa.sa_family != s2->addr.sa.sa_family)
                 return 0;
 
         // Now compare the addresses. IPv4 first
-        if (c1->addr.sa.sa_family == AF_INET)
+	if (s1->addr.sa.sa_family == AF_INET)
         {
-                return memcmp(&c1->addr.in.sin_addr,
-                                &c2->addr.in.sin_addr,
-                                sizeof(struct in_addr)) == 0;
+		return memcmp(&s1->addr.in.sin_addr,
+			      &s2->addr.in.sin_addr,
+                              sizeof(struct in_addr)) == 0;
         }
         else
         {
-                return memcmp(&c1->addr.in6.sin6_addr,
-                                &c2->addr.in6.sin6_addr,
-                                sizeof(struct in6_addr)) == 0;
+		return memcmp(&s1->addr.in6.sin6_addr,
+			      &s2->addr.in6.sin6_addr,
+			      sizeof(struct in6_addr)) == 0;
         }
 
         // (should) never be reached but compilers whine about this not
@@ -111,25 +114,25 @@ int CompareClients(client_t *c1, client_t *c2)
         return 0;
 }
 
-client_t *FindClient(socketstructs_t ss)
+client_t *FindClient(socket_t *s)
 {
 	// I felt like I was a nazi when I wrote this function...
-	if (ss.sa.sa_family == AF_INET)
+	if (s->addr.sa.sa_family == AF_INET)
         // Looking for an IPv4 address-based client
 	{
-		for (client_t *s = front; s; s = s->next)
+		for (client_t *c = front; c; c = c->next)
 		{
-                        if (memcmp(&ss.in.sin_addr, &s->addr.in.sin_addr, sizeof(struct in_addr)) == 0)
-                                return s;
+                        if (memcmp(&s->addr.in.sin_addr, &c->s->addr.in.sin_addr, sizeof(struct in_addr)) == 0)
+                                return c;
 		}
 	}
         else
         // Looking for an IPv6 address-based client
         {
-               for (client_t *s = front; s; s = s->next)
+               for (client_t *c = front; c; c = c->next)
                {
-                       if (memcmp(&ss.in6.sin6_addr, &s->addr.in6.sin6_addr, sizeof(struct in6_addr)) == 0)
-                               return s;
+                       if (memcmp(&s->addr.in6.sin6_addr, &c->s->addr.in6.sin6_addr, sizeof(struct in6_addr)) == 0)
+                               return c;
                }
         }
         

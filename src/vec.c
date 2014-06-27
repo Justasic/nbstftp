@@ -28,6 +28,7 @@
 #include "vec.h"
 #include <errno.h>
 #include <assert.h>
+#include "reallocarray.h"
 
 #define VEC_MIN_CAPACITY 4
 
@@ -95,7 +96,7 @@ void vec_splice_(char **data, int *length, int *capacity, int memsz, int start, 
 
 void vec_insert_(char **data, int *length, int *capacity, int memsz, int idx)
 {
-	assert(data && length && capacity && memsz && idx)
+	assert(data && length && capacity && memsz && idx);
 	vec_expand_(data, length, capacity, memsz);
 	// No reason to crash when trying to expand...
 	if (errno == ENOMEM)

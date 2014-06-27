@@ -22,6 +22,7 @@ user          { return USER; }
 group         { return GROUP; }
 pidfile       { return PIDFILE; }
 daemonize     { return DAEMONIZE; }
+readtimeout   { return READTIMEOUT; }
 
  /* Ignore white space */
 [ \t]                 { }

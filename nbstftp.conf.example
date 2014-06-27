@@ -33,4 +33,9 @@ server
 
         // Whether or not to daemonize to the background (default is true)
         //daemonize = true;
+	
+	// Time between event iterations within the program, time is measured in
+	// seconds. The lower the seconds, the faster the program will respond to
+	// events but the more CPU it will use. (default is 5 seconds).
+	readtimeout = 5;
 }

@@ -14,8 +14,17 @@
  */
 #pragma once
 #include <stddef.h>
+#include "reallocarray.h"
 
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+
+extern int running;
+
+// Allocators
 extern __attribute__((malloc)) void *nmalloc(size_t sz);
+#ifndef __OpenBSD__
+extern void *saferealloc(void *ptr, size_t length);
+#endif
 // The function never returns since it's a fatal error function.
 // tell the compiler that this kills the program so it can optimize
 // for it.

@@ -13,7 +13,6 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #define _POSIX_C_SOURCE 1
-#define _GNU_SOURCE 1
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -38,6 +37,7 @@
 #include "client.h"
 #include "misc.h"
 #include "signalhandler.h"
+#include "socket.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
@@ -94,158 +94,6 @@ write:
 	fclose(f);
 }
 
-// Process the incoming packet.
-void ProcessPacket(client_t *c, void *buffer, size_t len)
-{
-	// Sanity check
-	if (len > MAX_PACKET_SIZE)
-	{
-// 		Error(c, ERROR_ILLEGAL, "Invalid packet size");
-		printf("Received an invalidly sized packet.\n");
-		return;
-	}
-	
-	assert(buffer);
-
-	const packet_t *p = buffer;
-	
-	switch(ntohs(p->opcode))
-	{
-		case PACKET_DATA:
-			printf("Got a data packet\n");
-            if ((len + sizeof(packet_t) > MAX_PACKET_SIZE)
-            {
-                    fprintf(stderr, "Received an oversided data packet! Terminating transfer.\n");
-                    Error(client, ERROR_ILLEGAL, "Sent an oversided packet.");
-            }
-
-			if ((len - sizeof(packet_t)) < 512)
-				printf("Got end of data packet?\n");
-			break;
-		case PACKET_ERROR:
-		{
-			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
-			// to a const char * and send to printf.
-			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
-			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
-			
-			// Send an Acknowledgement packet.
-			Acknowledge(c, 1);
-			
-			// For whatever reason, BIOSes send a WRQ packet to verify the
-			// file exists and then cancels immediately upon receiving the
-			// first packet. This makes the server freak the fuck out and
-			// do things wrong. So here we deallocate if we run into any
-			// kind of error.
-			
-                        if (c->sendingfile)
-                        {
-				printf("Aborting file transfer.\n");
-				// Close the file and clean up.
-				fclose(c->f);
-				RemoveClient(c);
-			}
-			
-			break;
-		}
-		case PACKET_ACK:
-		{
-			char *addr1 = inet_ntoa(c->addr.in.sin_addr);
-			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
-			
-			if (c->sendingfile)
-			{
-				printf("Client is sending file\n");
-				uint8_t buf[512];
-				memset(buf, 0, sizeof(buf));
-				size_t readlen = fread(buf, 1, sizeof(buf), c->f);
-				
-				c->currentblockno++;
-				// We're at the end of the file.
-				if (MIN(512, readlen) != 512)
-				{
-					SendData(c, buf, readlen);
-					printf("Finished sending file\n");
-					// Close the file and clean up.
-					fclose(c->f);
-					RemoveClient(c);
-					break;
-				}
-				SendData(c, buf, readlen);
-			}
-
-			break;
-		}
-		case PACKET_WRQ:
-			
-			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-			
-			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
-			
-			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
-			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
-			break;
-		case PACKET_RRQ:
-		{
-			// Get the filename and modes
-			//
-			// Since we dig only past the first value in the struct, we only
-			// get the size of that first value (eg, the uint16_t)
-			// Use strndupa to use the stack frame for temporary allocation with a
-			// max length of 512 bytes. This will prevent buffer-overflow exploits (or so I hope)
-			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-			// This one is a bit weirder. We get the size of the uint16 like
-			// we did above but also skip our filename string AND the remaining
-			// null byte which strlen does not include.
-			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
-			
-			// mode can be "netascii", "octet", or "mail" case insensitive.
-			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
-
-			// We don't support mail-mode
-			if (!strcasecmp(mode, "mail"))
-			{
-				Error(c, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
-				break;
-			}
-			
-			int imode = strcasecmp(mode, "netascii");
-
-			char tmp[(1 << 16)];
-			sprintf(tmp, "%s/%s", config->directory, filename);
-
-			if (!FileExists(tmp))
-				Error(c, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
-
-			FILE *f = fopen(tmp, (imode == 0 ? "rt" : "rb"));
-			if (!f)
-			{
-				fprintf(stderr, "Failed to open file %s for sending: %s\n", tmp, strerror(errno));
-				Error(c, ERROR_NOFILE, "Cannot open file: %s", strerror(errno));
-				break;
-			}
-			
-			printf("File \"%s\" is available, sending first packet\n", tmp);
-
-			// file buffer
-			uint8_t buf[512];
-			memset(buf, 0, sizeof(buf));
-			size_t readlen = fread(buf, 1, sizeof(buf), f);
-			c->f = f;
-			c->currentblockno = 1;
-			c->sendingfile = 1;
-			SendData(c, buf, readlen);
-			
-			break;
-                }
-		default:
-			printf("Got unknown packet: %d\n", ntohs(p->opcode));
-			// Unknown packets are ignored according to the RFC.
-			//Error(c, ERROR_ILLEGAL, "Unknown packet");
-			break;
-	}
-}
-
 int main(int argc, char **argv)
 {
 	HandleArguments(argc, argv);
@@ -257,51 +105,24 @@ int main(int argc, char **argv)
 
 	if (ParseConfig(configfile) != 0)
 		die("FATAL: Failed to parse the config file!");
-
-
-	socketstructs_t myaddr;
-	int recvlen, fd;
-	unsigned char buf[MAX_PACKET_SIZE];
 	
 	// Write the PID file -- Also check for any other
 	// running versions of us.
 	WritePID();
-
-	// Create the UDP listening socket
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-	{
-		perror("Cannot create socket\n");
-		return EXIT_FAILURE;
-	}
 	
-	memset(&myaddr, 0, sizeof(myaddr));
-	myaddr.in.sin_family = AF_INET;
-	
-	switch (inet_pton(AF_INET, config->bindaddr, &myaddr.in.sin_addr))
-	{
-		case 1: // Success.
-			break;
-		case 0:
-			die("Invalid ipv4 bind address: %s", config->bindaddr);
-		default:
-			perror("inet_pton");
-			return EXIT_FAILURE;
-	}
-
-
-// 	myaddr.in.sin_addr.s_addr = htonl(INADDR_ANY);
 	// if the user didn't specify a port on the command line already
 	// use our own from the config or use the default (also from the
 	// config)
 	if (port == -1)
 		port = config->port;
-	myaddr.in.sin_port = htons(port);
-
-	if (bind(fd, &myaddr.sa, sizeof(myaddr.sa)) < 0)
+	
+	if (BindToSocket(config->bindaddr, port) == -1)
 	{
-		perror("bind failed");
-		goto cleanup;
+		unlink(config->pidfile);
+		DeallocateConfig(config);
+		return EXIT_FAILURE;
 	}
+
 	
 	// Change the user and group id.
 	if (SwitchUserAndGroup(config->user, config->group) == 1)
@@ -318,36 +139,14 @@ int main(int argc, char **argv)
 	// Enter idle loop.
 	while (running)
 	{
-		printf("Waiting on port %d\n", port);
-		
-                socketstructs_t addr;
-		socklen_t addrlen = sizeof(socketstructs_t);
-		recvlen = recvfrom(fd, buf, sizeof(buf), 0, &addr.sa, &addrlen);
-
-		// The kernel either told us that we need to read again
-		// or we received a signal and are continuing from where
-		// we left off.
-		if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
-			continue;
-		else if (recvlen == -1)
-		{
-			fprintf(stderr, "FATAL: Received an error when reading from the socket: %s\n", strerror(errno));
-			running = 0;
-			continue;
-		}
-
-                client_t *c = FindOrAllocateClient(addr, fd);
-		
-		printf("Received %d bytes from %s\n", recvlen, inet_ntoa(c->addr.in.sin_addr));
-		
-		// Process the packet received.
-		ProcessPacket(c, buf, recvlen);
+		// Process packets or wait on the sockets.
+		ProcessSockets();
 	}
 
 cleanup:
 	
-	// Close the file descriptor.
-	close(fd);
+	// Close the file descriptors.
+	ShutdownSockets();
 	
 	// Remove our PID
 	if (config)

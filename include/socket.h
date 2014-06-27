@@ -13,21 +13,36 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #pragma once
+#include <stddef.h>
+#include <stdint.h>
+#include "packets.h"
+#include "vec.h"
+// Forward declare to prevent circular includes.
+typedef struct client_s client_t;
 
-typedef struct config_s
+void ProcessPacket(client_t *c, void *buffer, size_t len);
+
+extern int BindToSocket(const char *addr, short port);
+
+extern int InitializeSockets(void);
+extern void ProcessSockets(void);
+extern void ShutdownSockets(void);
+
+enum
 {
-        char *bindaddr;
-        short port;
-        char *directory;
-        char *user;
-        char *group;
-	char *pidfile;
-        char daemonize;
-	int readtimeout;
-} config_t;
+	SF_WRITABLE = 1,
+	SF_READABLE = 2
+};
 
-// Defined in parser.y
-extern config_t *config;
+typedef struct socket_s
+{
+	int fd;
+	int type;
+	uint32_t flags;
+	socketstructs_t addr;
+	char *bindaddr;
+} socket_t;
 
-extern int ParseConfig(const char *filename);
-extern void DeallocateConfig(config_t *conf);
+typedef vec_t(socket_t*) socket_vec_t;
+
+extern void SetSocketStatus(socket_t *s, int status);

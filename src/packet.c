@@ -29,13 +29,80 @@
 #include <sys/types.h>
 #include <assert.h>
 #include "client.h"
-#include <misc.h>
+#include "misc.h"
+#include "socket.h"
+
+// Queue packets for sending -- internal function
+static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
+{
+	// We're adding another packet.
+	c->queuelen++;
+	// Try and keep up with the required queue
+	if (c->queuelen >= c->alloclen)
+	{
+		printf("Reallocating send queue to size %zu\n", c->queuelen);
+		void *newqueue = reallocarray(c->packetqueue, sizeof(packetqueue_t), c->queuelen);
+		if (!newqueue)
+		{
+			// This should cause a resend of the packet or a timeout.
+			fprintf(stderr, "Failed to allocate more slots in packet queue, discarding packet! (%s)\n",
+				strerror(errno));
+			if (allocated)
+				free(p);
+		}
+		c->alloclen = c->queuelen;
+		c->packetqueue = newqueue;
+	}
+	
+	packetqueue_t *pack = nmalloc(sizeof(packetqueue_t));
+	
+	c->packetqueue[c->queuelen] = pack;
+	pack->p = p;
+	pack->len = len;
+	pack->allocated = allocated;
+	
+	// We're ready to write.
+	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
+}
+
+// Send packets out the socket, this will be called by the epoll
+// system in socket.c.
+int SendPackets(void)
+{
+	extern client_t *front;
+	for (client_t *c = front; c; c = c->next)
+	{
+		for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
+		{
+			packetqueue_t *packet = c->packetqueue[i];
+			packet_t *p = packet->p;
+			size_t len = packet->len;
+			
+			int sendlen = sendto(c->s->fd, p, len, 0, &c->s->addr.sa, sizeof(c->s->addr.in));
+			if (sendlen == -1)
+			{
+				perror("sendto failed");
+				return -1;
+			}
+			
+			// Free the packet structure
+			if (packet->allocated)
+				free(packet->p);
+			
+			// We sent all the packets we want.
+			
+		}
+		SetSocketStatus(c->s, SF_READABLE);
+	}
+
+	return 0;
+}
 
 void SendData(client_t *c, void *data, size_t len)
 {
 	// Make sure the packet size does not exceed the max packet length.
         assert((len + sizeof(packet_t) <= MAX_PACKET_SIZE));
-        assert(c);
+        assert(c && data);
 	
 	// Allocate a packet that is as big as the data + len
 	packet_t *p = nmalloc(len + sizeof(packet_t));
@@ -54,12 +121,15 @@ void SendData(client_t *c, void *data, size_t len)
 	uint8_t *pptr = ((uint8_t*)p) + sizeof(packet_t);
 	memcpy(pptr, data, len);
 	
-	int sendlen = sendto(c->fd, p, len + sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.in));
-	if (sendlen == -1)
-		perror("sendto failed");
+	// Queue our packet for sending when EPoll comes around to send.
+	QueuePacket(c, p, len + sizeof(packet_t), 1);
 	
-	// Free our packet.
-	free(p);
+// 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.in));
+// 	if (sendlen == -1)
+// 		perror("sendto failed");
+// 	
+// 	// Free our packet.
+// 	free(p);
 }
 
 void Acknowledge(client_t *c, uint16_t blockno)
@@ -75,11 +145,13 @@ void Acknowledge(client_t *c, uint16_t blockno)
 	p.opcode = htons(PACKET_ACK);
 	p.blockno = htons(blockno);
 	
-	int sendlen = sendto(c->fd, &p, sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.sa));
-	if (sendlen == -1)
-	{
-		perror("sendto failed");
-	}
+	QueuePacket(c, &p, sizeof(packet_t), 0);
+	
+// 	int sendlen = sendto(c->fd, &p, sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.sa));
+// 	if (sendlen == -1)
+// 	{
+// 		perror("sendto failed");
+// 	}
 }
 
 __attribute__((format(printf, 3, 4)))
@@ -120,13 +192,15 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	strncpy((char*)pptr, buf, len);
 	// guaranteed null-termination.
 	pptr[len] = 0;
+	
+	QueuePacket(c, p, len + sizeof(packet_t) + 1, 1);
 
-	socklen_t socklen = sizeof(c->addr.in);
-	int sendlen = sendto(c->fd, p, len + sizeof(packet_t) + 1, 0, &c->addr.sa, socklen);
-	if (sendlen == -1)
-		perror("sendto failed");
-
-	// Free our packet.
-	free(p);
+// 	socklen_t socklen = sizeof(c->addr.in);
+// 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t) + 1, 0, &c->addr.sa, socklen);
+// 	if (sendlen == -1)
+// 		perror("sendto failed");
+// 
+// 	// Free our packet.
+// 	free(p);
         free(buf);
 }

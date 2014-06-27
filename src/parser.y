@@ -33,6 +33,7 @@ config_t *config;
 %token GROUP
 %token PIDFILE
 %token DAEMONIZE
+%token READTIMEOUT
 
 
 %%
@@ -47,11 +48,13 @@ server_entry: SERVER
 	// Defaults
 	config->port = -1;
 	config->daemonize = 1;
+	config->readtimeout = 5;
 }
 '{' server_items '}';
 
 server_items: | server_item server_items;
-server_item: server_bind | server_port | server_directory | server_user | server_group | server_daemonize | server_pidfile;
+server_item: server_bind | server_port | server_directory | server_user | server_group | server_daemonize |
+server_pidfile | server_readtimeout;
 
 
 server_bind: BIND '=' STR ';'
@@ -113,4 +116,9 @@ server_pidfile: PIDFILE '=' STR ';'
 		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
 		exit(1);
 	}
+};
+
+server_readtimeout: READTIMEOUT '=' CINT ';'
+{
+	config->readtimeout = yylval.ival;
 };

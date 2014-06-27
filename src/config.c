@@ -59,7 +59,6 @@ int ParseConfig(const char *filename)
 	
 	if (!config->directory)
 	{
-
 		fprintf(stderr, "You must specify a directory to serve files from in the config!");
 		return 1;
 	}
@@ -69,11 +68,17 @@ int ParseConfig(const char *filename)
 		config->bindaddr = "0.0.0.0";
 	
 	// Default is to use port 69
-	if (config->port == -1)
+	if (config->port == -1 || config->port == 0)
 		config->port = 69;
 	
 	if (!config->pidfile)
 		config->pidfile = "/var/run/nbstftp.pid";
+	
+	if (config->readtimeout > 1)
+	{
+		fprintf(stderr, "Error: Read Timeout time can be no less than 1 second! Setting to default of 5.\n");
+		config->readtimeout = 5;
+	}
 	
 	
         return ret;
