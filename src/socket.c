@@ -45,6 +45,8 @@ extern int port;
 epoll_t **events;
 size_t events_len = 5;
 
+void DestroySocket(socket_t *s);
+
 // Process the incoming packet.
 void ProcessPacket(client_t *c, void *buffer, size_t len)
 {
@@ -207,9 +209,8 @@ int BindToSocket(const char *addr, short port)
 	socketstructs_t saddr;
 	memset(&saddr, 0, sizeof(socketstructs_t));
 	
-	saddr.sa.sa_family = strstr(addr, ":") ? AF_INET6 : AF_INET;
+	saddr.sa.sa_family = strstr(addr, ":") != NULL ? AF_INET6 : AF_INET;
 	saddr.in.sin_port = htons(port);
-	
 	
 	switch (inet_pton(saddr.sa.sa_family, addr, &saddr.in.sin_addr))
 	{
@@ -254,9 +255,9 @@ int BindToSocket(const char *addr, short port)
 	ev.events = EPOLLIN;
 	ev.data.fd = fd;
 	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, ev.data.fd, &ev) == -1)
+	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
 	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", fd, strerror(errno));
+		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
 		close(fd);
 		return -1;
 	}
@@ -272,9 +273,7 @@ int BindToSocket(const char *addr, short port)
 	if (errno == ENOMEM)
 	{
 		fprintf(stderr, "Failed to add socket to socket pool!\n");
-		close(fd);
-		free(sock->bindaddr);
-		free(sock);
+		DestroySocket(sock);
 		return -1;
 	}
 	
@@ -331,7 +330,7 @@ void SetSocketStatus(socket_t *s, int status)
 	
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
 	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s->fd, strerror(errno));
+		fprintf(stderr, "Unable to set fd %d from epoll: %s\n", s->fd, strerror(errno));
 		vec_remove(&socketpool, s);
 		free(s->bindaddr);
 		free(s);
@@ -359,9 +358,9 @@ int InitializeSockets(void)
 		return -1;
 	}
 
-	// TODO: Get list of sockets from config
-	if (BindToSocket(config->bindaddr, port) == -1)
-		return -1;
+// 	// TODO: Get list of sockets from config
+// 	if (BindToSocket(config->bindaddr, port) == -1)
+// 		return -1;
 	
 	return 0;
 }

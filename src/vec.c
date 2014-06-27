@@ -46,7 +46,9 @@ void vec_expand_(char **data, int *length, int *capacity, int memsz)
 	
 		void *ndata = reallocarray(*data, *capacity, memsz);
 		*data = ndata ? ndata : *data;
-		errno = ENOMEM;
+		
+		if (!ndata)
+			errno = ENOMEM;
 	}
 }
 
@@ -60,7 +62,9 @@ void vec_reserve_(char **data, int *length, int *capacity, int memsz, int n)
 		*capacity = n;
 		void *ndata = reallocarray(*data, *capacity, memsz);
 		*data = ndata ? ndata : *data;
-		errno = ENOMEM;
+		
+		if (!ndata)
+			errno = ENOMEM;
 	}
 }
 
@@ -80,7 +84,8 @@ void vec_compact_(char **data, int *length, int *capacity, int memsz)
 	*capacity = *length;
 	void *ndata = reallocarray(*data, *capacity, memsz);
 	*data = ndata ? ndata : *data;
-	errno = ENOMEM;
+	if (!ndata)
+		errno = ENOMEM;
 }
 
 

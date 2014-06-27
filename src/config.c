@@ -44,9 +44,10 @@ int ParseConfig(const char *filename)
 #ifndef NDEBUG
 	printf("Config:\n");
 	if (config)
-		printf(" Bind: %s\n Port: %d\n Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n",
-		       config->bindaddr, config->port, config->directory, config->user, config->group,
-	 config->daemonize);
+		printf(" Bind: %s\n Port: %d\n Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n"
+			" Pidfile: %s\n Read Timeout: %d\n",
+			config->bindaddr, config->port, config->directory, config->user, config->group,
+			config->daemonize, config->pidfile, config->readtimeout);
 	else
 		printf(" Config is null!\n");
 #endif
@@ -74,7 +75,7 @@ int ParseConfig(const char *filename)
 	if (!config->pidfile)
 		config->pidfile = "/var/run/nbstftp.pid";
 	
-	if (config->readtimeout > 1)
+	if (config->readtimeout < 2)
 	{
 		fprintf(stderr, "Error: Read Timeout time can be no less than 1 second! Setting to default of 5.\n");
 		config->readtimeout = 5;

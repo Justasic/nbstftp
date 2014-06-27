@@ -116,6 +116,10 @@ int main(int argc, char **argv)
 	if (port == -1)
 		port = config->port;
 	
+	// Initialize the socket system.
+	InitializeSockets();
+	
+	// TODO: Get list of sockets from config and bind them.
 	if (BindToSocket(config->bindaddr, port) == -1)
 	{
 		unlink(config->pidfile);
@@ -123,7 +127,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	
 	// Change the user and group id.
 	if (SwitchUserAndGroup(config->user, config->group) == 1)
 	{
@@ -139,6 +142,7 @@ int main(int argc, char **argv)
 	// Enter idle loop.
 	while (running)
 	{
+		printf("iteration!\n");
 		// Process packets or wait on the sockets.
 		ProcessSockets();
 	}
