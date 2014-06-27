@@ -55,7 +55,7 @@ void vec_expand_(char **data, int *length, int *capacity, int memsz)
 
 void vec_reserve_(char **data, int *length, int *capacity, int memsz, int n)
 {
-	assert(data && length && capacity && memsz && n);
+	assert(data && length && capacity && memsz);
 	
 	if (n > *capacity)
 	{
@@ -91,7 +91,7 @@ void vec_compact_(char **data, int *length, int *capacity, int memsz)
 
 void vec_splice_(char **data, int *length, int *capacity, int memsz, int start, int count)
 {
-	assert(data && length && capacity && memsz && start && count);
+	assert(data && length && capacity && memsz && count);
 	
 	memmove(*data + start * memsz,
 		*data + (start + count) * memsz,
@@ -101,7 +101,7 @@ void vec_splice_(char **data, int *length, int *capacity, int memsz, int start, 
 
 void vec_insert_(char **data, int *length, int *capacity, int memsz, int idx)
 {
-	assert(data && length && capacity && memsz && idx);
+	assert(data && length && capacity && memsz);
 	vec_expand_(data, length, capacity, memsz);
 	// No reason to crash when trying to expand...
 	if (errno == ENOMEM)
@@ -115,7 +115,7 @@ void vec_insert_(char **data, int *length, int *capacity, int memsz, int idx)
 
 void vec_swap_(char **data, int *length, int *capacity, int memsz, int idx1, int idx2)
 {
-	assert(data && length && capacity && memsz && idx1 && idx2);
+	assert(data && length && capacity && memsz);
 	char *tmp;
 	vec_expand_(data, length, capacity, memsz);
 	// No reason to crash when trying to expand...

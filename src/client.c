@@ -51,7 +51,7 @@ client_t *FindOrAllocateClient(socket_t *s)
         {
                 found = malloc(sizeof(client_t));
                 memset(found, 0, sizeof(client_t));
-                memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
+//                 memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
                 found->s = s;
                 AddClient(found);
         }

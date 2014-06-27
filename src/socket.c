@@ -42,7 +42,7 @@ socket_vec_t socketpool;
 int EpollHandle = -1;
 extern int port;
 
-epoll_t **events;
+epoll_t *events;
 size_t events_len = 5;
 
 void DestroySocket(socket_t *s);
@@ -81,16 +81,16 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// to a const char * and send to printf.
 			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
-			
+
 			// Send an Acknowledgement packet.
 			Acknowledge(c, 1);
-			
+
 			// For whatever reason, BIOSes send a WRQ packet to verify the
 			// file exists and then cancels immediately upon receiving the
 			// first packet. This makes the server freak the fuck out and
 			// do things wrong. So here we deallocate if we run into any
 			// kind of error.
-			
+
                         if (c->sendingfile)
                         {
 				printf("Aborting file transfer.\n");
@@ -98,7 +98,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				fclose(c->f);
 				RemoveClient(c);
 			}
-			
+
 			break;
 		}
 		case PACKET_ACK:
@@ -131,11 +131,10 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		}
 		case PACKET_WRQ:
 		{
-			
 			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-			
+
 			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
-			
+
 			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
 			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
 			break;
@@ -163,7 +162,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				Error(c, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
 				break;
 			}
-			
+
 			int imode = strcasecmp(mode, "netascii");
 
 			char tmp[(1 << 16)];
@@ -179,7 +178,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				Error(c, ERROR_NOFILE, "Cannot open file: %s", strerror(errno));
 				break;
 			}
-			
+
 			printf("File \"%s\" is available, sending first packet\n", tmp);
 
 			// file buffer
@@ -190,7 +189,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			c->currentblockno = 1;
 			c->sendingfile = 1;
 			SendData(c, buf, readlen);
-			
+
 			break;
                 }
 		default:
@@ -204,11 +203,11 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 int BindToSocket(const char *addr, short port)
 {
 	assert(addr);
-	
+
 	int fd = 0;
 	socketstructs_t saddr;
 	memset(&saddr, 0, sizeof(socketstructs_t));
-	
+
 	saddr.sa.sa_family = strstr(addr, ":") != NULL ? AF_INET6 : AF_INET;
 	saddr.in.sin_port = htons(port);
 	
@@ -223,14 +222,14 @@ int BindToSocket(const char *addr, short port)
 			perror("inet_pton");
 			return -1;
 	}
-	
+
 	// Create the UDP listening socket
 	if ((fd = socket(saddr.sa.sa_family, SOCK_DGRAM, 0)) < 0)
 	{
 		perror("Cannot create socket\n");
 		return -1;
 	}
-	
+
 	// Set it as non-blocking
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
@@ -239,7 +238,7 @@ int BindToSocket(const char *addr, short port)
 		close(fd);
 		return -1;
 	}
-	
+
 	// Bind to the socket
 	if (bind(fd, &saddr.sa, sizeof(saddr.sa)) < 0)
 	{
@@ -247,27 +246,27 @@ int BindToSocket(const char *addr, short port)
 		close(fd);
 		return -1;
 	}
-	
+
 	// Add it to EPoll
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
-	
+
 	ev.events = EPOLLIN;
 	ev.data.fd = fd;
-	
+
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
 	{
 		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
 		close(fd);
 		return -1;
 	}
-	
+
 	socket_t *sock = nmalloc(sizeof(socket_t));
 	sock->bindaddr = strdup(addr);
 	sock->type = saddr.sa.sa_family;
 	sock->fd = fd;
 	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
-	
+
 	vec_push(&socketpool, sock);
 	// Make sure we could add the socket.
 	if (errno == ENOMEM)
@@ -276,7 +275,7 @@ int BindToSocket(const char *addr, short port)
 		DestroySocket(sock);
 		return -1;
 	}
-	
+
 	// Return success
 	return 0;
 }
@@ -285,13 +284,13 @@ socket_t *FindSocket(int fd)
 {
 	socket_t *s = NULL;
 	int i;
-	
+
 	vec_foreach(&socketpool, s, i)
 	{
 		if (s->fd == fd)
 			return s;
 	}
-	
+
 	return NULL;
 }
 
@@ -301,7 +300,7 @@ void DestroySocket(socket_t *s)
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
 	ev.data.fd = s->fd;
-	
+
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_DEL, ev.data.fd, &ev) == -1)
 	{
 		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s->fd, strerror(errno));
@@ -310,7 +309,7 @@ void DestroySocket(socket_t *s)
 		free(s);
 		return;
 	}
-	
+
 	// Now remove it from our vector
 	vec_remove(&socketpool, s);
 	// Close the socket
@@ -324,10 +323,10 @@ void SetSocketStatus(socket_t *s, int status)
 {
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
-	
+
 	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
 	ev.data.fd = s->fd;
-	
+
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
 	{
 		fprintf(stderr, "Unable to set fd %d from epoll: %s\n", s->fd, strerror(errno));
@@ -345,13 +344,13 @@ int InitializeSockets(void)
 	assert(config);
 
 	EpollHandle = epoll_create(4);
-	
+
 	events = reallocarray(NULL, events_len, sizeof(epoll_t));
 	if (!events)
 		return -1;
-	
+
 	vec_init(&socketpool);
-	
+
 	if (errno == ENOMEM)
 	{
 		fprintf(stderr, "Failed to allocate socket pool!\n");
@@ -361,7 +360,7 @@ int InitializeSockets(void)
 // 	// TODO: Get list of sockets from config
 // 	if (BindToSocket(config->bindaddr, port) == -1)
 // 		return -1;
-	
+
 	return 0;
 }
 
@@ -369,7 +368,7 @@ void ShutdownSockets(void)
 {
 	socket_t *s;
 	int i;
-	
+
 	// Close all the sockets
 	vec_foreach(&socketpool, s, i)
 	{
@@ -377,12 +376,12 @@ void ShutdownSockets(void)
 		free(s->bindaddr);
 		free(s);
 	}
-	
+
 	vec_deinit(&socketpool);
-	
+
 	// Close the EPoll handle.
 	close(EpollHandle);
-	
+
 	// Free our events
 	free(events);
 }
@@ -391,48 +390,66 @@ void ProcessSockets(void)
 {
 	if (socketpool.length > events_len)
 	{
-		void *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
+		printf("Resizing array to support events_len\n");
+		epoll_t *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
 		if (!newptr)
 		{
 			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
 				strerror(errno));
 		}
-		
-		events_len *= 2;
-		events = newptr;
+		else
+		{
+			events_len *= 2;
+			events = newptr;
+		}
 	}
+	printf("socketpool length %d\nepoll events length: %d\n", socketpool.length, events_len);
 	
-	int total = epoll_wait(EpollHandle, *events, events_len, config->readtimeout * 1000);
-	
+	printf("Entering epoll_wait\n");
+
+	int total = epoll_wait(EpollHandle, events, events_len, config->readtimeout * 1000);
+
 	if (total == -1)
 	{
 		if (errno != EINTR)
-			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
+		{
+			if (errno == EFAULT)
+			{
+				fprintf(stderr, "EFAULT\n");
+				exit(1);
+			}
+			else
+				fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
+		}
 		return;
 	}
 	
+	printf("epoll_wait returned %d descriptors\n", total);
+
+// 	epoll_t *next = events;
 	for (int i = 0; i < total; ++i)
 	{
-		epoll_t *ev = events[i];
-		
+		epoll_t *ev = &events[i];
+
 		socket_t *s = FindSocket(ev->data.fd);
 		if (!s)
 			continue;
-		
+
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{
 			printf("Epoll error reading socket %d, destroying.\n", s->fd);
 			DestroySocket(s);
 			continue;
 		}
-		
+
 		// process socket read events.
 		if (ev->events & EPOLLIN)
 		{
+			printf("Received read on socket %d\n", s->fd);
 			socklen_t addrlen = sizeof(socketstructs_t);
 			uint8_t buf[MAX_PACKET_SIZE];
 			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &s->addr.sa, &addrlen);
-			
+
 			// The kernel either told us that we need to read again
 			// or we received a signal and are continuing from where
 			// we left off.
@@ -445,15 +462,15 @@ void ProcessSockets(void)
 				DestroySocket(s);
 				continue;
 			}
-			
+
 			client_t *c = FindOrAllocateClient(s);
-			
+
 			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(s->addr.in.sin_addr), s->fd);
-			
+
 			// Process the packet received.
 			ProcessPacket(c, buf, recvlen);
 		}
-		
+
 		// Process socket write events
 		if (ev->events & EPOLLOUT && SendPackets() != -1)
 			DestroySocket(s);

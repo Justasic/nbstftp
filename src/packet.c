@@ -35,13 +35,12 @@
 // Queue packets for sending -- internal function
 static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 {
+	printf("Queuing packet %d len %d\n", p->opcode, len);
 	// We're adding another packet.
-	c->queuelen++;
 	// Try and keep up with the required queue
 	if (c->queuelen >= c->alloclen)
 	{
-		printf("Reallocating send queue to size %zu\n", c->queuelen);
-		void *newqueue = reallocarray(c->packetqueue, sizeof(packetqueue_t), c->queuelen);
+		packetqueue_t **newqueue = reallocarray(c->packetqueue, sizeof(packetqueue_t), c->queuelen);
 		if (!newqueue)
 		{
 			// This should cause a resend of the packet or a timeout.
@@ -55,11 +54,11 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	}
 	
 	packetqueue_t *pack = nmalloc(sizeof(packetqueue_t));
-	
-	c->packetqueue[c->queuelen] = pack;
 	pack->p = p;
 	pack->len = len;
 	pack->allocated = allocated;
+	
+	c->packetqueue[c->queuelen++] = pack;
 	
 	// We're ready to write.
 	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
@@ -75,22 +74,24 @@ int SendPackets(void)
 		for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
 		{
 			packetqueue_t *packet = c->packetqueue[i];
-			packet_t *p = packet->p;
-			size_t len = packet->len;
+			printf("Packet %d length %d\n", ntohs(packet->p->opcode), packet->len);
 			
-			int sendlen = sendto(c->s->fd, p, len, 0, &c->s->addr.sa, sizeof(c->s->addr.in));
+			printf("Responding on socket %d\n", c->s->fd);
+			
+			int sendlen = sendto(c->s->fd, packet->p, packet->len, 0, &c->s->addr.sa, sizeof(c->s->addr.in));
 			if (sendlen == -1)
 			{
 				perror("sendto failed");
 				return -1;
 			}
 			
+			printf("Sent packet of length %d\n", sendlen);
+			
 			// Free the packet structure
 			if (packet->allocated)
 				free(packet->p);
 			
 			// We sent all the packets we want.
-			
 		}
 		SetSocketStatus(c->s, SF_READABLE);
 	}
