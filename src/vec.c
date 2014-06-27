@@ -18,9 +18,9 @@
  * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * 
- * Copied (almost) directly from the OpenBSD libc. My copyright notice was kept
- * for the minor modifications I had made to the libc version to become compatible
- * with this project. You may remove my copyright as long as you remove my modifications.
+ * My copyright notice was kept for the minor modifications I had made to the libc version
+ * to become compatible with this project. You may remove my copyright as long as you remove
+ * my modifications.
  * 
  * Original Version found at: https://github.com/rxi/vec/tree/bd10a28c759a34212601efc5735fe082011a0092
  */
