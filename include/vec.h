@@ -150,19 +150,16 @@
 void vec_expand_(char **data, int *length, int *capacity, int memsz);
 void vec_reserve_(char **data, int *length, int *capacity, int memsz, int n);
 void vec_compact_(char **data, int *length, int *capacity, int memsz);
-void vec_splice_(char **data, int *length, int *capacity, int memsz,
-                 int start, int count);
-void vec_insert_(char **data, int *length, int *capacity, int memsz,
-                 int idx);
-void vec_swap_(char **data, int *length, int *capacity, int memsz,
-               int idx1, int idx2);
+void vec_splice_(char **data, int *length, int *capacity, int memsz, int start, int count);
+void vec_insert_(char **data, int *length, int *capacity, int memsz, int idx);
+void vec_swap_(char **data, int *length, int *capacity, int memsz, int idx1, int idx2);
 
 
-typedef vec_t(void*) vec_void_t;
-typedef vec_t(char*) vec_str_t;
-typedef vec_t(int) vec_int_t;
-typedef vec_t(char) vec_char_t;
-typedef vec_t(float) vec_float_t;
+typedef vec_t(void*)  vec_void_t;
+typedef vec_t(char*)  vec_str_t;
+typedef vec_t(int)    vec_int_t;
+typedef vec_t(char)   vec_char_t;
+typedef vec_t(float)  vec_float_t;
 typedef vec_t(double) vec_double_t;
 
 #endif
