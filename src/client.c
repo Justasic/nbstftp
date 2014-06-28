@@ -49,6 +49,7 @@ client_t *FindOrAllocateClient(socket_t *s)
 
         if (!found)
         {
+		printf("Allocating client!\n");
                 found = malloc(sizeof(client_t));
                 memset(found, 0, sizeof(client_t));
 //                 memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
@@ -122,7 +123,7 @@ client_t *FindClient(socket_t *s)
 	{
 		for (client_t *c = front; c; c = c->next)
 		{
-                        if (memcmp(&s->addr.in.sin_addr, &c->s->addr.in.sin_addr, sizeof(struct in_addr)) == 0)
+			if (c->s->fd == s->fd)
                                 return c;
 		}
 	}
@@ -131,7 +132,7 @@ client_t *FindClient(socket_t *s)
         {
                for (client_t *c = front; c; c = c->next)
                {
-                       if (memcmp(&s->addr.in6.sin6_addr, &c->s->addr.in6.sin6_addr, sizeof(struct in6_addr)) == 0)
+		       if (c->s->fd == s->fd)
                                return c;
                }
         }
