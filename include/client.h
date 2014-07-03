@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include "packets.h"
+#include "vec.h"
 // #include "socket.h"
 typedef struct socket_s socket_t;
 
@@ -39,15 +40,13 @@ typedef struct client_s
 	packetqueue_t **packetqueue;
 	size_t queuelen, alloclen;
 
-        // The last packet of data we sent.
-        packet_t *lpacket;
-        size_t lpacketlen;
-
         // Current file we're sending
         FILE *f;
-        // Next and previous clients
-	struct client_s *next, *prev;
 } client_t;
+
+typedef vec_t(client_t*) client_vec_t;
+// Our client pool
+extern client_vec_t clientpool;
 
 // Add a client to the existing client list
 extern void AddClient(client_t *c);
@@ -59,4 +58,5 @@ extern int CompareClients(client_t *c1, client_t *c2);
 extern client_t *FindClient(socket_t *s);
 // Either find a client or allocate a new one, also adds it to the linked list.
 extern client_t *FindOrAllocateClient(socket_t *s);
+extern void DeallocateClients(void);
 

@@ -49,7 +49,6 @@ static void SignalHandler(int sig)
 			running = 0;
 			break;
 		case SIGPIPE:
-			
 			printf("Received SIGPIPE, ignoring...\n");
 			break;
 		default:

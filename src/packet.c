@@ -35,11 +35,12 @@
 // Queue packets for sending -- internal function
 static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 {
-	printf("Queuing packet %d len %d\n", p->opcode, len);
+	printf("Queuing packet %d len %zu\n", p->opcode, len);
 	// We're adding another packet.
 	// Try and keep up with the required queue
-	if (c->queuelen >= c->alloclen)
+	if (++c->queuelen >= c->alloclen)
 	{
+		printf("Expanding queue to %zu items (%zu bytes total)\n", c->queuelen, c->queuelen * sizeof(packetqueue_t));
 		packetqueue_t **newqueue = reallocarray(c->packetqueue, sizeof(packetqueue_t), c->queuelen);
 		if (!newqueue)
 		{
@@ -58,8 +59,9 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	pack->len = len;
 	pack->allocated = allocated;
 	
-	c->packetqueue[c->queuelen++] = pack;
+	c->packetqueue[c->queuelen-1] = pack;
 	
+	printf("Setting socket as writable\n");
 	// We're ready to write.
 	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
 }
@@ -68,17 +70,19 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 // system in socket.c.
 int SendPackets(void)
 {
-	extern client_t *front;
-	for (client_t *c = front; c; c = c->next)
+	client_t *c = NULL;
+	int i;
+	
+	vec_foreach(&clientpool, c, i)
 	{
 		for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
 		{
 			packetqueue_t *packet = c->packetqueue[i];
-			printf("Packet %d length %d\n", ntohs(packet->p->opcode), packet->len);
+			printf("Packet %d length %zu\n", ntohs(packet->p->opcode), packet->len);
 			
 			printf("Responding on socket %d\n", c->s->fd);
 			
-			int sendlen = sendto(c->s->fd, packet->p, packet->len, 0, &c->s->addr.sa, sizeof(c->s->addr.in));
+			int sendlen = sendto(c->s->fd, packet->p, packet->len, 0, &c->s->addr.sa, sizeof(c->s->addr.sa));
 			if (sendlen == -1)
 			{
 				perror("sendto failed");
@@ -93,6 +97,7 @@ int SendPackets(void)
 			
 			// We sent all the packets we want.
 		}
+		printf("Setting socket as readable\n");
 		SetSocketStatus(c->s, SF_READABLE);
 	}
 
@@ -165,24 +170,25 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	//     -------------------------------------------
 	//
 
-        assert(c);
-        
-	size_t len = strlen(str);
+	assert(c);
 
-        char *buf = nmalloc(len*len);
-        va_list ap;
-        va_start(ap, str);
-        len = vsnprintf(buf, len*len, str, ap);
-        va_end(ap);
-
-        len = strlen(buf);
-        buf = realloc(buf, len+1);
+	char *buf = NULL;
+	va_list ap;
+	va_start(ap, str);
+	size_t len = vasprintf(&buf, str, ap);
+	va_end(ap);
 	
-        // If your message is seriously bigger than 512 characters
-        // then you need to rethink what is going on.
-        // The end user doesn't need a god damn book because a file
-        // doesn't exist or some shit.
-        assert((len + sizeof(packet_t)) <= MAX_PACKET_SIZE);
+	if (len == -1)
+	{
+		fprintf(stderr, "ERROR: cannot format error string: %s\n", strerror(errno));
+		return;
+	}
+
+	// If your message is seriously bigger than 512 characters
+	// then you need to rethink what is going on.
+	// The end user doesn't need a god damn book because a file
+	// doesn't exist or some shit.
+	assert((len + sizeof(packet_t)) <= MAX_PACKET_SIZE);
 
 	packet_t *p = nmalloc(len + sizeof(packet_t) + 1);
 	p->opcode   = htons(PACKET_ERROR);

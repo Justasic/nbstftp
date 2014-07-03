@@ -119,6 +119,9 @@ int main(int argc, char **argv)
 	// Initialize the socket system.
 	InitializeSockets();
 	
+	// Initialize the client pool
+	vec_init(&clientpool);
+	
 	// TODO: Get list of sockets from config and bind them.
 	if (BindToSocket(config->bindaddr, port) == -1)
 	{
@@ -142,7 +145,7 @@ int main(int argc, char **argv)
 	// Enter idle loop.
 	while (running)
 	{
-		printf("iteration!\n");
+// 		printf("iteration!\n");
 		// Process packets or wait on the sockets.
 		ProcessSockets();
 	}
@@ -151,6 +154,9 @@ cleanup:
 	
 	// Close the file descriptors.
 	ShutdownSockets();
+	
+	// Deallocate client pool
+	DeallocateClients();
 	
 	// Remove our PID
 	if (config)

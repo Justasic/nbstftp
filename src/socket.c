@@ -246,6 +246,23 @@ int BindToSocket(const char *addr, short port)
 		close(fd);
 		return -1;
 	}
+	
+#if 0
+	// Test to make sure this shit really is nonblocking
+	{
+		socketstructs_t addr;
+		socklen_t addrlen = sizeof(addr.sa);
+		uint8_t buf[MAX_PACKET_SIZE];
+		size_t recvlen = recvfrom(fd, buf, sizeof(buf), 0, &addr.sa, &addrlen);
+		if (recvlen == -1)
+		{
+			if (errno == EAGAIN)
+				printf("EAGAIN! We're nonblocking!\n");
+			else
+				fprintf(stderr, "What the fuck? %s\n", strerror(errno));
+		}
+	}
+#endif
 
 	// Add it to EPoll
 	epoll_t ev;
@@ -265,7 +282,8 @@ int BindToSocket(const char *addr, short port)
 	sock->bindaddr = strdup(addr);
 	sock->type = saddr.sa.sa_family;
 	sock->fd = fd;
-	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
+	sock->addr = saddr;
+	sock->flags = ev.events;
 
 	vec_push(&socketpool, sock);
 	// Make sure we could add the socket.
@@ -326,6 +344,9 @@ void SetSocketStatus(socket_t *s, int status)
 
 	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
 	ev.data.fd = s->fd;
+	
+	printf("Setting socket %d status %d! (was %d)\n", ev.data.fd, ev.events, s->flags);
+	s->flags = ev.events;
 
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
 	{
@@ -403,8 +424,6 @@ void ProcessSockets(void)
 			events = newptr;
 		}
 	}
-	printf("socketpool length %d\nepoll events length: %d\n", socketpool.length, events_len);
-	
 	printf("Entering epoll_wait\n");
 
 	int total = epoll_wait(EpollHandle, events, events_len, config->readtimeout * 1000);
@@ -424,7 +443,8 @@ void ProcessSockets(void)
 		return;
 	}
 	
-	printf("epoll_wait returned %d descriptors\n", total);
+	if (total)
+		printf("epoll_wait returned %d descriptors\n", total);
 
 // 	epoll_t *next = events;
 	for (int i = 0; i < total; ++i)
@@ -433,7 +453,10 @@ void ProcessSockets(void)
 
 		socket_t *s = FindSocket(ev->data.fd);
 		if (!s)
+		{
+			printf("Could not find socket %d\n", ev->data.fd);
 			continue;
+		}
 
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{
@@ -446,7 +469,7 @@ void ProcessSockets(void)
 		if (ev->events & EPOLLIN)
 		{
 			printf("Received read on socket %d\n", s->fd);
-			socklen_t addrlen = sizeof(socketstructs_t);
+			socklen_t addrlen = sizeof(s->addr);
 			uint8_t buf[MAX_PACKET_SIZE];
 			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &s->addr.sa, &addrlen);
 
@@ -468,7 +491,7 @@ void ProcessSockets(void)
 			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(s->addr.in.sin_addr), s->fd);
 
 			// Process the packet received.
-			ProcessPacket(c, buf, recvlen);
+// 			ProcessPacket(c, buf, recvlen);
 		}
 
 		// Process socket write events

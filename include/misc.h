@@ -14,6 +14,7 @@
  */
 #pragma once
 #include <stddef.h>
+#include <stdarg.h>
 #include "reallocarray.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -29,7 +30,7 @@ extern void *saferealloc(void *ptr, size_t length);
 // tell the compiler that this kills the program so it can optimize
 // for it.
 extern void die(const char *, ...) __attribute__ ((noreturn));
-
 extern int SwitchUserAndGroup(const char *user, const char *group);
-
 extern void Daemonize(void);
+extern int vasprintf(char **str, const char *fmt, va_list args);
+

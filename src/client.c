@@ -16,67 +16,55 @@
 typedef struct client_s client_t;
 #include "client.h"
 #include "socket.h"
+#include "vec.h"
+#include "misc.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <netinet/in.h>
+#include <errno.h>
 
-client_t *front = NULL, *end = NULL;
+client_vec_t clientpool;
 
 void AddClient(client_t *c)
 {
 	assert(c);
 	
-	if (!front)
+	vec_push(&clientpool, c);
+	// Make sure we could add the socket.
+	if (errno == ENOMEM)
 	{
-		front = c;
-                end = front;
-		c->next = NULL;
-		c->prev = NULL;
-		return;
+		fprintf(stderr, "Failed to add client to client pool!\n");
+		RemoveClient(c);
 	}
-	
-	c->prev = end;
-        c->next = NULL;
-        end->next = c;
-        end = c;
 }
 
 client_t *FindOrAllocateClient(socket_t *s)
 {
-        client_t *found = FindClient(s);
+	assert(s);
+	
+	client_t *found = FindClient(s);
 
-        if (!found)
-        {
+	if (!found)
+	{
 		printf("Allocating client!\n");
-                found = malloc(sizeof(client_t));
-                memset(found, 0, sizeof(client_t));
+		found = nmalloc(sizeof(client_t));
 //                 memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
-                found->s = s;
-                AddClient(found);
-        }
+		found->s = s;
+		AddClient(found);
+	}
 
-        return found;
+	return found;
 }
 
 void RemoveClient(client_t *c)
 {
 	assert(c);
 
-        if (c->prev)
-                c->prev->next = c->next;
+	vec_remove(&clientpool, c);
 
-        if (c->next)
-                c->next->prev = c->prev;
-
-        if (c == end)
-                end = c->prev;
-
-        if (c == front)
-                front = c->next;
-
-        free(c);
+	free(c);
 }
 
 int CompareClients(client_t *c1, client_t *c2)
@@ -117,26 +105,48 @@ int CompareClients(client_t *c1, client_t *c2)
 
 client_t *FindClient(socket_t *s)
 {
-	// I felt like I was a nazi when I wrote this function...
-	if (s->addr.sa.sa_family == AF_INET)
-        // Looking for an IPv4 address-based client
-	{
-		for (client_t *c = front; c; c = c->next)
+	assert(s);
+	
+	printf("Finding client for socket %d\n", s->fd);
+	
+	for (int idx = 0; idx < (&clientpool)->length; idx++)
+		if ((&clientpool)->data[idx]->s->fd == s->fd)
 		{
-			if (c->s->fd == s->fd)
-                                return c;
+			printf(" Found\n");
+			return (&clientpool)->data[idx];
 		}
-	}
-        else
-        // Looking for an IPv6 address-based client
-        {
-               for (client_t *c = front; c; c = c->next)
-               {
-		       if (c->s->fd == s->fd)
-                               return c;
-               }
-        }
         
+        printf(" Not found\n");
         // Couldn't find the client, fall through to return NULL.
         return NULL;
+}
+
+void DeallocateClients(void)
+{
+	client_t *c = NULL;
+	int i;
+	
+	// Deallocate any remaining packets and the client's queue.
+	vec_foreach(&clientpool, c, i)
+	{
+		if (c->queuelen)
+		{
+			printf("Not sending %zu packets to sock %d due to shutdown\n", c->queuelen, c->s->fd);
+			for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
+			{
+				packetqueue_t *packet = c->packetqueue[i];
+				
+				// Free the packet structure
+				if (packet->allocated)
+					free(packet->p);
+			}
+		}
+		
+		// Deallocate the client
+		free(c->packetqueue);
+		free(c);
+	}
+	
+	// Deallocate the client pool
+	vec_deinit(&clientpool);
 }
