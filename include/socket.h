@@ -46,3 +46,7 @@ typedef struct socket_s
 typedef vec_t(socket_t*) socket_vec_t;
 
 extern void SetSocketStatus(socket_t *s, int status);
+extern short GetPort(socket_t *s);
+extern void DestroySocket(socket_t *s, uint8_t close);
+
+extern socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding);

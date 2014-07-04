@@ -40,18 +40,19 @@ void AddClient(client_t *c)
 	}
 }
 
-client_t *FindOrAllocateClient(socket_t *s)
+client_t *FindOrAllocateClient(socket_t *cs)
 {
-	assert(s);
+	assert(cs);
 	
-	client_t *found = FindClient(s);
+	client_t *found = FindClient(cs);
 
 	if (!found)
 	{
-		printf("Allocating client!\n");
+		printf("*** Allocating client!\n");
 		found = nmalloc(sizeof(client_t));
 //                 memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
-		found->s = s;
+		// Make a permanent socket which gets added to the socket vector.
+		found->s = AddSocket(cs->fd, NULL, cs->type, cs->addr, 0);
 		AddClient(found);
 	}
 
@@ -62,8 +63,13 @@ void RemoveClient(client_t *c)
 {
 	assert(c);
 
+	// Remove the socket from the socket pool
+	DestroySocket(c->s, 0);
+	
+	// Remove the client from the client pool
 	vec_remove(&clientpool, c);
 
+	// Delete the client
 	free(c);
 }
 
@@ -107,16 +113,20 @@ client_t *FindClient(socket_t *s)
 {
 	assert(s);
 	
-	printf("Finding client for socket %d\n", s->fd);
+// 	printf("Finding client for socket %d\n", s->fd);
 	
 	for (int idx = 0; idx < (&clientpool)->length; idx++)
 		if ((&clientpool)->data[idx]->s->fd == s->fd)
 		{
-			printf(" Found\n");
-			return (&clientpool)->data[idx];
+			client_t *c = (&clientpool)->data[idx];
+			if (GetPort(c->s) == GetPort(s))
+			{
+// 				printf(" Found\n");
+				return c;
+			}
 		}
         
-        printf(" Not found\n");
+//         printf(" Not found\n");
         // Couldn't find the client, fall through to return NULL.
         return NULL;
 }

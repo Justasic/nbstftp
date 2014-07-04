@@ -45,8 +45,6 @@ extern int port;
 epoll_t *events;
 size_t events_len = 5;
 
-void DestroySocket(socket_t *s);
-
 // Process the incoming packet.
 void ProcessPacket(client_t *c, void *buffer, size_t len)
 {
@@ -114,17 +112,19 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				size_t readlen = fread(buf, 1, sizeof(buf), c->f);
 				
 				c->currentblockno++;
+				
+				// Sending a file
+				SendData(c, buf, readlen);
+				
 				// We're at the end of the file.
 				if (MIN(512, readlen) != 512)
 				{
-					SendData(c, buf, readlen);
 					printf("Finished sending file\n");
 					// Close the file and clean up.
 					fclose(c->f);
 					RemoveClient(c);
 					break;
 				}
-				SendData(c, buf, readlen);
 			}
 
 			break;
@@ -264,38 +264,56 @@ int BindToSocket(const char *addr, short port)
 	}
 #endif
 
-	// Add it to EPoll
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
-
-	ev.events = EPOLLIN;
-	ev.data.fd = fd;
-
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
+	if (!AddSocket(fd, addr, saddr.sa.sa_family, saddr, 1))
 	{
-		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
-		close(fd);
-		return -1;
-	}
-
-	socket_t *sock = nmalloc(sizeof(socket_t));
-	sock->bindaddr = strdup(addr);
-	sock->type = saddr.sa.sa_family;
-	sock->fd = fd;
-	sock->addr = saddr;
-	sock->flags = ev.events;
-
-	vec_push(&socketpool, sock);
-	// Make sure we could add the socket.
-	if (errno == ENOMEM)
-	{
-		fprintf(stderr, "Failed to add socket to socket pool!\n");
-		DestroySocket(sock);
+		fprintf(stderr, "Failed to bind to socket!\n");
 		return -1;
 	}
 
 	// Return success
 	return 0;
+}
+
+socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding)
+{
+	// Add it to EPoll
+	if (binding)
+	{
+		epoll_t ev;
+		memset(&ev, 0, sizeof(epoll_t));
+		
+		ev.events = EPOLLIN;
+		ev.data.fd = fd;
+		
+		if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
+		{
+			fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
+			close(fd);
+			return NULL;
+		}
+	}
+	
+	if (!addr)
+		addr = inet_ntoa(saddr.in.sin_addr);
+	
+	socket_t *sock = nmalloc(sizeof(socket_t));
+	sock->bindaddr = strdup(addr);
+	sock->type = saddr.sa.sa_family;
+	sock->fd = fd;
+// 	sock->addr = saddr;
+	sock->flags = EPOLLIN;
+	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
+	
+	vec_push(&socketpool, sock);
+	// Make sure we could add the socket.
+	if (errno == ENOMEM)
+	{
+		fprintf(stderr, "Failed to add socket to socket pool!\n");
+		DestroySocket(sock, 0);
+		return NULL;
+	}
+	
+	return sock;
 }
 
 socket_t *FindSocket(int fd)
@@ -312,7 +330,19 @@ socket_t *FindSocket(int fd)
 	return NULL;
 }
 
-void DestroySocket(socket_t *s)
+short GetPort(socket_t *s)
+{
+	// if IPv4, get IPv4 port
+	if (s->addr.sa.sa_family == AF_INET)
+		return ntohs(s->addr.in.sin_port);
+	// Otherwise, get IPv6 port
+	else if(s->addr.sa.sa_family == AF_INET6)
+		return htons(s->addr.in6.sin6_port);
+	
+	return -1;
+}
+
+void DestroySocket(socket_t *s, uint8_t closefd)
 {
 	// First, remove it from the EPoll system.
 	epoll_t ev;
@@ -331,7 +361,8 @@ void DestroySocket(socket_t *s)
 	// Now remove it from our vector
 	vec_remove(&socketpool, s);
 	// Close the socket
-	close(s->fd);
+	if (closefd)
+		close(s->fd);
 	// Free a string then free itself.
 	free(s->bindaddr);
 	free(s);
@@ -344,8 +375,6 @@ void SetSocketStatus(socket_t *s, int status)
 
 	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
 	ev.data.fd = s->fd;
-	
-	printf("Setting socket %d status %d! (was %d)\n", ev.data.fd, ev.events, s->flags);
 	s->flags = ev.events;
 
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
@@ -461,17 +490,18 @@ void ProcessSockets(void)
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{
 			printf("Epoll error reading socket %d, destroying.\n", s->fd);
-			DestroySocket(s);
+			DestroySocket(s, 1);
 			continue;
 		}
 
 		// process socket read events.
 		if (ev->events & EPOLLIN)
 		{
-			printf("Received read on socket %d\n", s->fd);
-			socklen_t addrlen = sizeof(s->addr);
+// 			printf("Received read on socket %d port %d\n", s->fd, GetPort(s));
+			socketstructs_t ss;
+			socklen_t addrlen = sizeof(ss);
 			uint8_t buf[MAX_PACKET_SIZE];
-			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &s->addr.sa, &addrlen);
+			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
 
 			// The kernel either told us that we need to read again
 			// or we received a signal and are continuing from where
@@ -482,20 +512,30 @@ void ProcessSockets(void)
 			{
 				fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
 // 				running = 0;
-				DestroySocket(s);
+				DestroySocket(s, 1);
 				continue;
 			}
+			
+			// Create our temp client socket
+			socket_t cs;
+			cs.fd = s->fd;
+			cs.type = s->type;
+			cs.addr = ss;
+			
+			// Either find the client or allocate a new client and socket
+			client_t *c = FindOrAllocateClient(&cs);
 
-			client_t *c = FindOrAllocateClient(s);
-
-			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(s->addr.in.sin_addr), s->fd);
+			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s->fd);
 
 			// Process the packet received.
-// 			ProcessPacket(c, buf, recvlen);
+			ProcessPacket(c, buf, recvlen);
 		}
 
 		// Process socket write events
-		if (ev->events & EPOLLOUT && SendPackets() != -1)
-			DestroySocket(s);
+		if (ev->events & EPOLLOUT && SendPackets() == -1)
+		{
+			printf("Destorying socket due to send failure!\n");
+			DestroySocket(s, 1);
+		}
 	}
 }

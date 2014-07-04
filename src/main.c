@@ -125,9 +125,8 @@ int main(int argc, char **argv)
 	// TODO: Get list of sockets from config and bind them.
 	if (BindToSocket(config->bindaddr, port) == -1)
 	{
-		unlink(config->pidfile);
-		DeallocateConfig(config);
-		return EXIT_FAILURE;
+		fprintf(stderr, "Failed to bind to socket!\n");
+		goto cleanup;
 	}
 
 	// Change the user and group id.

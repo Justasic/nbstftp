@@ -35,7 +35,7 @@
 // Queue packets for sending -- internal function
 static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 {
-	printf("Queuing packet %d len %zu\n", p->opcode, len);
+// 	printf("Queuing packet %d len %zu\n", p->opcode, len);
 	// We're adding another packet.
 	// Try and keep up with the required queue
 	if (++c->queuelen >= c->alloclen)
@@ -61,7 +61,7 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	
 	c->packetqueue[c->queuelen-1] = pack;
 	
-	printf("Setting socket as writable\n");
+// 	printf("Setting socket as writable\n");
 	// We're ready to write.
 	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
 }
@@ -75,12 +75,12 @@ int SendPackets(void)
 	
 	vec_foreach(&clientpool, c, i)
 	{
-		for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
+		for (size_t i = 0, end = c->queuelen; i < end; ++i)
 		{
 			packetqueue_t *packet = c->packetqueue[i];
-			printf("Packet %d length %zu\n", ntohs(packet->p->opcode), packet->len);
+			printf("Sending packet %d length %zu\n", ntohs(packet->p->opcode), packet->len);
 			
-			printf("Responding on socket %d\n", c->s->fd);
+// 			printf("Responding on socket %d port %d (%d)\n", c->s->fd, GetPort(c->s), c->s->addr.in.sin_port);
 			
 			int sendlen = sendto(c->s->fd, packet->p, packet->len, 0, &c->s->addr.sa, sizeof(c->s->addr.sa));
 			if (sendlen == -1)
@@ -88,16 +88,17 @@ int SendPackets(void)
 				perror("sendto failed");
 				return -1;
 			}
-			
-			printf("Sent packet of length %d\n", sendlen);
-			
-			// Free the packet structure
+		
+// 			printf("Sent packet of length %d\n", sendlen);
+		
+// 			Free the packet structure
 			if (packet->allocated)
 				free(packet->p);
 			
 			// We sent all the packets we want.
 		}
-		printf("Setting socket as readable\n");
+		c->queuelen = 0;
+// 		printf("Setting socket as readable\n");
 		SetSocketStatus(c->s, SF_READABLE);
 	}
 
@@ -129,13 +130,6 @@ void SendData(client_t *c, void *data, size_t len)
 	
 	// Queue our packet for sending when EPoll comes around to send.
 	QueuePacket(c, p, len + sizeof(packet_t), 1);
-	
-// 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.in));
-// 	if (sendlen == -1)
-// 		perror("sendto failed");
-// 	
-// 	// Free our packet.
-// 	free(p);
 }
 
 void Acknowledge(client_t *c, uint16_t blockno)
@@ -152,12 +146,6 @@ void Acknowledge(client_t *c, uint16_t blockno)
 	p.blockno = htons(blockno);
 	
 	QueuePacket(c, &p, sizeof(packet_t), 0);
-	
-// 	int sendlen = sendto(c->fd, &p, sizeof(packet_t), 0, &c->addr.sa, sizeof(c->addr.sa));
-// 	if (sendlen == -1)
-// 	{
-// 		perror("sendto failed");
-// 	}
 }
 
 __attribute__((format(printf, 3, 4)))
@@ -202,12 +190,5 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	
 	QueuePacket(c, p, len + sizeof(packet_t) + 1, 1);
 
-// 	socklen_t socklen = sizeof(c->addr.in);
-// 	int sendlen = sendto(c->fd, p, len + sizeof(packet_t) + 1, 0, &c->addr.sa, socklen);
-// 	if (sendlen == -1)
-// 		perror("sendto failed");
-// 
-// 	// Free our packet.
-// 	free(p);
         free(buf);
 }
