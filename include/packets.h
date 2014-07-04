@@ -83,7 +83,8 @@ typedef union socketstructs_s
 	struct sockaddr sa;
 } socketstructs_t;
 
-#include "client.h"
+// Forward declare to prevent recursive includes.
+typedef struct client_s client_t;
 
 // Functions
 __attribute__((format(printf, 3, 4)))

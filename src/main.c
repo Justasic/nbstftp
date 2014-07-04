@@ -13,22 +13,8 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #define _POSIX_C_SOURCE 1
-#include <stdio.h>
 #include <unistd.h>
-#include <string.h>
-#include <bsd/string.h>
-#include <strings.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <dirent.h>
-#include <time.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <signal.h>
-#include <assert.h>
-#include <alloca.h>
 
 #include "packets.h"
 #include "config.h"
@@ -46,8 +32,6 @@ short port = -1;
 
 // Fork to background unless otherwise specified
 int nofork = -1;
-// int ipv4_only = 0;
-// int ipv6_only = 0;
 char *configfile = NULL;
 
 void WritePID(void)

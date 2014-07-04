@@ -18,7 +18,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-
 int FileExists(const char *file)
 {
 	struct stat sb;

@@ -19,10 +19,6 @@ typedef struct client_s client_t;
 #include "vec.h"
 #include "misc.h"
 #include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <netinet/in.h>
 #include <errno.h>
 
 client_vec_t clientpool;

@@ -72,29 +72,6 @@ void *nmalloc(size_t sz)
 	return ptr;
 }
 
-// OpenBSD-like saferealloc.
-#ifndef __OpenBSD__
-void *saferealloc(void *ptr, size_t length)
-{
-	void *newptr;
-	
-	if(length <= 0)
-		length = 1;
-	
-	/* If ptr is NULL then realloc does a malloc */
-	newptr = realloc(ptr, length);
-	if (newptr == 0)
-	{
-		fprintf(stderr, "realloc failed to set pointer %p to size %lu: %s",
-			ptr, length, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	
-	return newptr;
-}
-#endif
-
-
 int vasprintf(char **str, const char *fmt, va_list args)
 {
 	int size = 0;

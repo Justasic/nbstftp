@@ -35,7 +35,6 @@
 // Queue packets for sending -- internal function
 static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 {
-// 	printf("Queuing packet %d len %zu\n", p->opcode, len);
 	// We're adding another packet.
 	// Try and keep up with the required queue
 	if (++c->queuelen >= c->alloclen)
