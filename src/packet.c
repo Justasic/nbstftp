@@ -61,7 +61,6 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	
 	c->packetqueue[c->queuelen-1] = pack;
 	
-// 	printf("Setting socket as writable\n");
 	// We're ready to write.
 	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
 }
@@ -89,17 +88,19 @@ int SendPackets(void)
 				return -1;
 			}
 		
-// 			printf("Sent packet of length %d\n", sendlen);
-		
-// 			Free the packet structure
+			// Free the packet structure
 			if (packet->allocated)
 				free(packet->p);
-			
-			// We sent all the packets we want.
 		}
 		c->queuelen = 0;
-// 		printf("Setting socket as readable\n");
 		SetSocketStatus(c->s, SF_READABLE);
+		
+		if (c->destroy)
+		{
+			if (c->f)
+				fclose(c->f);
+			RemoveClient(c);
+		}
 	}
 
 	return 0;

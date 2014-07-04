@@ -120,9 +120,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				if (MIN(512, readlen) != 512)
 				{
 					printf("Finished sending file\n");
-					// Close the file and clean up.
-					fclose(c->f);
-					RemoveClient(c);
+					c->destroy = 1;
 					break;
 				}
 			}

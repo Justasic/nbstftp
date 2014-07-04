@@ -64,7 +64,7 @@ void RemoveClient(client_t *c)
 	assert(c);
 
 	// Remove the socket from the socket pool
-	DestroySocket(c->s, 0);
+// 	DestroySocket(c->s, 0);
 	
 	// Remove the client from the client pool
 	vec_remove(&clientpool, c);

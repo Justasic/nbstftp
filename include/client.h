@@ -33,7 +33,7 @@ typedef struct client_s
 	socket_t *s;
         // Status variables
 	uint16_t currentblockno;
-        uint8_t gotack, sendingfile;
+        uint8_t waiting, sendingfile, destroy;
 	
 	// Buffered packets. May use it later when a packet has not
 	// been received yet and we need to resend.
