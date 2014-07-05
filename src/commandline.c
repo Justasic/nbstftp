@@ -18,17 +18,21 @@
 #include <stdio.h>
 #include <strings.h>
 #include <stdlib.h>
+#include "sysconf.h"
+#include <string.h>
 
 static void PrintHelp(void)
 {
-	fprintf(stderr, "Usage: nbstftp [OPTION]... [INTERFACE [PORT]]\n");
-	fprintf(stderr, "The no bullshit TFTP server, used to serve files over TFTP\n");
+	fprintf(stderr, "The no bullshit TFTP server, used to serve files over TFTP\n\n");
+	fprintf(stderr, "Usage: nbstftp [OPTION]...\n");
 	fprintf(stderr, "\nOptions:\n");
 	fprintf(stderr, "-f, --nofork        Do not daemonize (don't fork to background)\n");
 	fprintf(stderr, "-c, --config        Specify a config file\n");
 	fprintf(stderr, "-p, --port          Specify a port to listen on\n");
 	fprintf(stderr, "-h, --help          This message\n");
 	fprintf(stderr, "-l, --license       Print license message\n");
+	fprintf(stderr, "-v, --version       Print version information\n");
+	fprintf(stderr, "\nReport bugs to https://github.com/justasic/nbstftp/issues\n");
 	
 	exit(EXIT_FAILURE);
 }
@@ -38,9 +42,22 @@ static void PrintLicense(void)
 	// Print the license header. We have to allocate due to
 	// no null terminator.
 	char *str = nmalloc(LICENSE_len+1);
+	memcpy(str, LICENSE, LICENSE_len);
 	str[LICENSE_len+1] = 0;
 	fprintf(stderr, "%s", str);
 	free(str);
+	exit(EXIT_FAILURE);
+}
+
+static void PrintVersion(void)
+{
+	fprintf(stderr, "The No Bullshit TFTP server version v" VERSION_FULL "\n\n");
+	char *str = nmalloc(LICENSE_len+1);
+	memcpy(str, LICENSE, LICENSE_len);
+	str[LICENSE_len+1] = 0;
+	fprintf(stderr, "%s", str);
+	free(str);
+	fprintf(stderr, "\n\nWritten by Justin Crawford\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -62,6 +79,8 @@ void HandleArguments(int argc, char **argv)
 				PrintLicense();
 			else if (!strcasecmp(arg, "nofork"))
 				nofork = 1;
+			else if (!strcasecmp(arg, "version"))
+				PrintVersion();
 			else if (!strcasecmp(arg, "config"))
 			{ // Make sure they actually specified a config file...
 				if (i+1 >= argc)
@@ -97,6 +116,8 @@ void HandleArguments(int argc, char **argv)
 				PrintLicense();
 			else if (!strcasecmp(arg, "f"))
 				nofork = 1;
+			else if (!strcasecmp(arg, "v"))
+				PrintVersion();
 			else if (!strcasecmp(arg, "c"))
 			{
 				if (i+1 >= argc)
