@@ -27,9 +27,53 @@ Print license information
 .BR \fB\-v\fR ", "\fB\-\-version\fR
 Print version information
 .SH CONFIGURATION FILE
-TODO: config section! :D
+The server configuration is quite simple. There is a `server' block for the runtime configuration and the `listen' blocks used for binding to ip addresses and ports. You are allowed to have multiple listen blocks so long as they do not conflict with any existing listen block. You cannot have multiple server blocks (since it would not make sense anyway).
+
+Syntax is as follows:
+
+ blockname {
+    var1 = "string value";
+    var2 = 12345;
+    var3 = true;
+ }
+
+All blocks must begin with an open curley brace and a close curley brace. Each item within the block must contain a semi-colon for termination. Spacing is optional. All strings must begin with a quote and end with a quote. All values read as numbers are converted to integers. Acceptable boolean values are 1, 0, true, false, yes, and no.
+
+C-style and C++-style comments are accepted.
+
+// Single line comment
+
+/* Multi-line
+   comment*/
+.TP
+.SH `server' block
+The server block defines how the actual binary runs within the system. The following options are valid within a server block.
+.TP
+.BR \fBdirectory\fR " \- "(string " \- "required)
+The directory statement specify where to look for files to serve over TFTP. This directory is mandatory and has no default. Usually you would set this to "/tftpboot" or "/srv/tftp" or similar.
+.TP
+.BR \fBuser\fR " \- "(string " \- "optional)
+The user statement specifies what user the server should run under. When the server is launched, it must be run as root to bind to port 69, when the binding has completed, the server will switch to the specified user and continue to run under that user. The default behavior is to run as the user the server was executed as (usually root).
+.TP
+.BR \fBgroup\fR " \- "(string " \- "optional)
+The group is similar to the user option above but does the same to the group. This is useful for default file permissions. Default behavior is to run as the same group as the executing user (usually root).
+.TP
+.BR \fBpidfile\fR " \- "(string " \- "optional)
+The PID file is a file used for the process id, this is usually somewhere in /var/run and it is used to restart or stop the server. The default location is '/var/run/nbstftp.pid'.
+.TP
+.BR \fBreadtimeout\fR " \- "(number " \- "optional)
+The readtimeout value is used by the multiplexer (epoll/poll/select) to specify the amount of time (in seconds) before the multiplexer times out and lets the process run events. This means that the higher the number the slower the application is to respond to events (such as when a ping timeout needs to happen). This does not affect how fast the server receives or processes packets (it's mostly used for timers). Default timeout time is 5 seconds.
+.TP
+.SH `listen' block
+The listen block defines which addresses to bind to and what ports to listen on. The default config file binds to all interfaces and accept from all addresses and any UDP packets on port 69. You may limit this or listen on more ports.
+.TP
+.BR \fBbind\fR " \- "(string " \- "required)
+The bind value is a IPv4 or IPv6 address used to bind to an interface or "0.0.0.0"/"::" for all addresses on a specific port. You may bind to the same interface multiple times so long as the ports differ.
+.TP
+.BR \fBport\fR " \- "(number " \- "required)
+The port is used to define what port to listen on while bound to an interface.
 .SH AUTHOR
-Written by Justin Crawford
+Poorly written by Justin Crawford
 .SH "REPORTING BUGS"
 Report bugs to https://github.com/justasic/nbstftp/issues
 .SH COPYRIGHT
