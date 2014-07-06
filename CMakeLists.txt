@@ -92,6 +92,7 @@ include (CheckTypeSize)
 include (CheckIncludeFile)
 include (CheckLibraryExists)
 include (CheckFunctionExists)
+include (CheckCSourceCompiles)
 
 check_type_size(int8_t INT8_T)
 check_type_size(uint8_t UINT8_T)
@@ -101,8 +102,16 @@ check_type_size(uint32_t UINT32_T)
 check_type_size(int64_t INT64_T)
 check_type_size(uint64_t UINT64_T)
 
-check_function_exists(strndupa HAVE_STRNDUPA)
+#check_function_exists(strndupa HAVE_STRNDUPA)
 check_function_exists(strnlen HAVE_STRNLEN)
+
+# Because strndupa is apparnetly not a function or some shit, we must
+# make sure this program compiles.
+check_c_source_compiles("
+#define _GNU_SOURCE 1
+#include <string.h>
+int main() { const char *abc = \"abc\"; char *str = strndupa(abc, 5); return 0; }
+" HAVE_STRNDUPA)
 
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
