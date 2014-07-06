@@ -14,7 +14,6 @@
  */
 
 #include "misc.h"
-#define _POSIX_SOURCE
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>

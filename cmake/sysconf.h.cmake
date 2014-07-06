@@ -20,6 +20,8 @@
 #cmakedefine HAVE_DLSYM 1
 #cmakedefine HAVE_DLFCN_H 1
 #cmakedefine HAVE_EXECINFO_H 1
+#cmakedefine HAVE_STRNDUPA 1
+#cmakedefine HAVE_STRNLEN 1
 
 #define VERSION_MAJOR        @PROJECT_MAJOR_VERSION@
 #define VERSION_MINOR        @PROJECT_MINOR_VERSION@

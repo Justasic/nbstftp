@@ -12,8 +12,6 @@
 * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#define _POSIX_C_SOURCE 1
-#define _GNU_SOURCE 1
 #include "process.h"
 #include "misc.h"
 #include "config.h"
@@ -21,6 +19,8 @@
 #include "filesystem.h"
 #include <assert.h>
 #include <errno.h>
+#include "sysconf.h"
+#include <strings.h>
 
 // Process the incoming packet.
 void ProcessPacket(client_t *c, void *buffer, size_t len)
@@ -54,7 +54,11 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		{
 			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
 			// to a const char * and send to printf.
+#ifdef HAVE_STRNDUPA
 			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
+#else
+            const char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
+#endif
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 
 			// Send an Acknowledgement packet.
@@ -73,6 +77,10 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				fclose(c->f);
 				RemoveClient(c);
 			}
+
+#ifndef HAVE_STRNDUPA
+            free(error);
+#endif
 
 			break;
 		}
@@ -105,16 +113,26 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		}
 		case PACKET_WRQ:
 		{
+#ifdef HAVE_STRNDUPA
 			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-
 			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+#else
+         	const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+			const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+#endif
 
 			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
 			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
+
+#ifndef HAVE_STRNDUPA
+            free(filename);
+            free(mode);
+#endif
 			break;
 		}
 		case PACKET_RRQ:
 		{
+#ifdef HAVE_STRNDUPA
 			// Get the filename and modes
 			//
 			// Since we dig only past the first value in the struct, we only
@@ -126,6 +144,10 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
 			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+#else
+            const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+            const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+#endif
 			
 			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
@@ -163,6 +185,11 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			c->currentblockno = 1;
 			c->sendingfile = 1;
 			SendData(c, buf, readlen);
+
+#ifndef HAVE_STRNDUPA
+            free(filename);
+            free(mode);
+#endif
 
 			break;
                 }

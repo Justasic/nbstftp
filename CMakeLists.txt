@@ -62,10 +62,36 @@ endif (CLANGXX)
 # Finally initialize our project
 project(nbstftp C)
 
+include (CheckCCompilerFlag)
+
+# Make sure the compiler accepts C11
+check_c_compiler_flag(-std=c11 HAVE_C11_FLAG)
+set(CFLAGS "${CFLAGS} -std=c11 -g -Werror=implicit-function-declaration")
+
+if (NOT HAVE_C11_FLAG)
+    message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
+endif (NOT HAVE_C11_FLAG)
+
+# Add some feature test macro definitions.
+# _GNU_SOURCE is used because we use strndupa and alloca, remove references to alloca/strndupa and
+# you can remove this feature test macro for _GNU_SOURCE
+add_definitions(-D_POSIX_SOURCE=1 -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE=1)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+    # Add some freebsd-specific macros
+    add_definitions(-D_BSD_SOURCE)
+endif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    # Add some linux-specific macros
+    add_definitions(-D_GNU_SOURCE=1)
+endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+# Check for platform-specific things we need
 include (CheckTypeSize)
 include (CheckIncludeFile)
 include (CheckLibraryExists)
-include (CheckCCompilerFlag)
+include (CheckFunctionExists)
 
 check_type_size(int8_t INT8_T)
 check_type_size(uint8_t UINT8_T)
@@ -75,13 +101,8 @@ check_type_size(uint32_t UINT32_T)
 check_type_size(int64_t INT64_T)
 check_type_size(uint64_t UINT64_T)
 
-# Make sure the compiler accepts C11
-check_c_compiler_flag(-std=c11 HAVE_C11_FLAG)
-set(CFLAGS "${CFLAGS} -std=c11 -g -Werror=implicit-function-declaration")
-
-if (NOT HAVE_C11_FLAG)
-    message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
-endif (NOT HAVE_C11_FLAG)
+check_function_exists(strndupa HAVE_STRNDUPA)
+check_function_exists(strnlen HAVE_STRNLEN)
 
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)

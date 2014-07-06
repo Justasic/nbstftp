@@ -12,11 +12,9 @@
  * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#define _POSIX_C_SOURCE 1
 #include <unistd.h>
 #include <signal.h>
 
-#include "packets.h"
 #include "config.h"
 #include "commandline.h"
 #include "filesystem.h"
@@ -24,6 +22,7 @@
 #include "misc.h"
 #include "signalhandler.h"
 #include "socket.h"
+//#include "packets.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
