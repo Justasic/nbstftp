@@ -14,8 +14,8 @@
  */
 #include "sysconf.h"
 
-#ifndef HAVE_SYS_EPOLL_H
-# error You probably shouldn't be trying to compile an epoll multiplexer on a epoll-unsupported platform. Try again.
+#ifndef HAVE_KQUEUE
+# error You probably shouldn't be trying to compile a kqueue multiplexer on a kqueue-unsupported platform. Try again.
 #endif
 
 #include "socket.h"
@@ -24,91 +24,97 @@
 #include "client.h"
 #include "process.h"
 
-#include <sys/epoll.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include <sys/event.h>
+#include <sys/time.h>
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-typedef struct epoll_event epoll_t;
-// Static because it never leaves this file.
-static int EpollHandle = -1;
-static epoll_t *events;
-static size_t events_len = 5;
+// Make it easier
+typedef struct kevent kevent_t;
+
+static int KqueueHandle = -1;
+static kevent_t *events, *changed;
+static size_t events_len = 5, changed_len = 5;
+static unsigned int changedSz;
+
+static inline kevent_t *GetChangeEvent(void)
+{
+	if (changedSz == changed_len)
+	{
+		printf("Resizing array to support changed_len\n");
+		kevent_t *newptr = reallocarray(changed, changed_len * 2, sizeof(kevent_t));
+		if (!newptr)
+		{
+			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
+				strerror(errno));
+		}
+		else
+		{
+			changed_len *= 2;
+			changed = newptr;
+		}
+	}
+	
+	return &changed[changedSz++];
+}
 
 int AddToMultiplexer(int fd)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
-	
-	ev.events = EPOLLIN;
-	ev.data.fd = fd;
-	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
-	{
-		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
-		return -1;
-	}
-	
-	return 0;
+	kevent_t *event = GetChangeEvent();
+	EV_SET(event, fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
 }
 
 int RemoveFromMultiplexer(int fd)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
-	ev.data.fd = fd;
-	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_DEL, ev.data.fd, &ev) == -1)
-	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", fd, strerror(errno));
-		return -1;
-	}
-	
-	return 0;
+	kevent_t *event = GetChangeEvent();
+	EV_SET(event, fd, 0, EV_DELETE, 0, 0, NULL);
 }
 
 int SetSocketStatus(socket_t *s, int status)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
+	kevent_t *event = GetChangeEvent();
 	
-	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
-	ev.data.fd = s->fd;
-	s->flags = ev.events;
+	int mod = 0;
+	if (status & SF_READABLE)
+		mod = EVFILT_READ;
+	else if (status & SF_WRITABLE)
+		mod = EVFILT_WRITE;
+	else
+		return;
 	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
-	{
-		fprintf(stderr, "Unable to set fd %d from epoll: %s\n", s->fd, strerror(errno));
-		return -1;
-	}
-	return 0;
+	EV_SET(event, s->fd, mod, EV_ADD, 0, 0, NULL);
 }
 
 int InitializeMultiplexer(void)
 {
-	EpollHandle = epoll_create(4);
-	
-	events = reallocarray(NULL, events_len, sizeof(epoll_t));
-	if (!events)
+	if ((KqueueHandle = kqueue()) < 0)
 	{
-		fprintf(stderr, "Failed to realloc an array for epoll: %s\n", strerror(errno));
+		fprintf(stderr, "Unable to create kqueue handle: %s\n", strerror(errno));
 		return -1;
 	}
+	
+	events = reallocarray(NULL, events_len, sizeof(kevent_t));
+	if (!events)
+	{
+		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
+		return -1;
+	}
+	
+	changed = reallocarray(NULL, changed_len, sizeof(kevent_t));
+	if (!changed)
+	{
+		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
+		return -1;
+	}
+	
 	return 0;
 }
 
 int ShutdownMultiplexer(void)
 {
-	// Close the EPoll handle.
-	close(EpollHandle);
-	
-	// Free our events
+	close(KqueueHandle);
+	free(changed);
 	free(events);
-	return 0;
 }
 
 extern socket_vec_t socketpool;
@@ -117,7 +123,7 @@ void ProcessSockets(void)
 	if (socketpool.length > events_len)
 	{
 		printf("Resizing array to support events_len\n");
-		epoll_t *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
+		kevent_t *newptr = reallocarray(events, events_len * 2, sizeof(kevent_t));
 		if (!newptr)
 		{
 			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
@@ -129,9 +135,11 @@ void ProcessSockets(void)
 			events = newptr;
 		}
 	}
-	printf("Entering epoll_wait\n");
+	printf("Entering kevent\n");
 	
-	int total = epoll_wait(EpollHandle, events, events_len, config->readtimeout * 1000);
+	static struct timespec kqtime = { Config->ReadTimeout, 0 };
+	int total = kevent(KqueueHandle, changed, changed_len, events, events_len, &kqtime);
+	changedSz = 0;
 	
 	if (total == -1)
 	{
@@ -150,16 +158,19 @@ void ProcessSockets(void)
 	
 	for (int i = 0; i < total; ++i)
 	{
-		epoll_t *ev = &events[i];
+		kevent_t *ev = &events[i];
 		
-		socket_t *s = FindSocket(ev->data.fd);
+		if (ev->flags & EV_ERROR)
+			continue;
+		
+		socket_t *s = FindSocket(ev->ident);
 		if (!s)
 		{
-			printf("Could not find socket %d\n", ev->data.fd);
+			printf("Could not find socket %d\n", ev->ident);
 			continue;
 		}
 		
-		if (ev->events & (EPOLLHUP | EPOLLERR))
+		if (ev->flags & EV_EOF)
 		{
 			printf("Epoll error reading socket %d, destroying.\n", s->fd);
 			DestroySocket(s, 1);
@@ -167,7 +178,7 @@ void ProcessSockets(void)
 		}
 		
 		// process socket read events.
-		if (ev->events & EPOLLIN)
+		if (ev->filter & FVFILT_READ)
 		{
 // 			printf("Received read on socket %d port %d\n", s->fd, GetPort(s));
 			socketstructs_t ss;
@@ -204,7 +215,7 @@ void ProcessSockets(void)
 		}
 		
 		// Process socket write events
-		if (ev->events & EPOLLOUT && SendPackets() == -1)
+		if (ev->filter & FVFILT_WRITE && SendPackets() == -1)
 		{
 			printf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);

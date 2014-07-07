@@ -22,15 +22,15 @@ int FileExists(const char *file)
 {
 	struct stat sb;
 
-	if(stat(file, &sb) == -1)
+	if (stat(file, &sb) == -1)
 		return 0;
 
-	if(S_ISDIR(sb.st_mode))
+	if (S_ISDIR(sb.st_mode))
 		return 0;
 
 	FILE *input = fopen(file, "r");
 
-	if(input == NULL)
+	if (input == NULL)
 		return 0;
 	else
 		fclose(input);
@@ -42,7 +42,7 @@ int IsDirectory(const char *dir)
 {
 	struct stat fileinfo;
 	
-	if(stat(dir, &fileinfo) == 0)
+	if (stat(dir, &fileinfo) == 0)
 	{
 		if (S_ISDIR(fileinfo.st_mode))
 			return 1;
