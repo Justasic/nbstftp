@@ -104,6 +104,12 @@ check_type_size(uint64_t UINT64_T)
 
 #check_function_exists(strndupa HAVE_STRNDUPA)
 check_function_exists(strnlen HAVE_STRNLEN)
+check_include_file(sys/epoll.h HAVE_SYS_EPOLL_H)
+
+# If epoll is found, append it.
+if (HAVE_SYS_EPOLL_H)
+    list(APPEND SOURCE_FILES src/multiplexers/multiplexer_epoll.c)
+endif (HAVE_SYS_EPOLL_H)
 
 # Because strndupa is apparnetly not a function or some shit, we must
 # make sure this program compiles.

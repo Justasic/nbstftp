@@ -13,33 +13,19 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #pragma once
-#include <stddef.h>
-#include <stdint.h>
-#include "packets.h"
-#include "vec.h"
-#include "multiplexer.h"
-// Forward declare to prevent circular includes.
-typedef struct client_s client_t;
+typedef struct socket_s socket_t;
 
-extern int BindToSocket(const char *addr, short port);
-
-extern int InitializeSockets(void);
-extern void ProcessSockets(void);
-extern void ShutdownSockets(void);
-
-typedef struct socket_s
+// Multiplexer socket statuses
+enum
 {
-	int fd;
-	int type;
-	uint32_t flags;
-	socketstructs_t addr;
-	char *bindaddr;
-} socket_t;
+	SF_WRITABLE = 1,
+	SF_READABLE = 2
+};
 
-typedef vec_t(socket_t*) socket_vec_t;
+extern int AddToMultiplexer(int fd);
+extern int RemoveFromMultiplexer(int fd);
+extern int SetSocketStatus(socket_t *s, int status);
 
-extern short GetPort(socket_t *s);
-extern void DestroySocket(socket_t *s, uint8_t close);
-
-extern socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding);
-extern socket_t *FindSocket(int fd);
+extern int InitializeMultiplexer(void);
+extern int ShutdownMultiplexer(void);
+extern void ProcessSockets(void);
