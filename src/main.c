@@ -73,6 +73,11 @@ write:
 	
 	fprintf(f, "%d", getpid());
 	fclose(f);
+	
+	// If we're part of a user or group, change to that user/group so
+	// we can remove it when we shut down.
+	if (config->user || config->group)
+		SetFilePermissions(config->pidfile, config->user, config->group, 0777);
 }
 
 int main(int argc, char **argv)

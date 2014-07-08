@@ -22,6 +22,8 @@
 #include <grp.h>    // For /etc/group related functions
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
+#include <sys/stat.h> // for chmod/chown
 
 void die(const char *msg, ...)
 {
@@ -157,6 +159,64 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			fprintf(stderr, "Cannot setgid to %s: %s\n", group, strerror(errno));
 			return 1;
 		}
+	}
+	
+	return 0;
+}
+
+int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions)
+{
+	assert(file);
+	
+	if (!user && !group)
+		return 0;
+	
+	uid_t uid = 0;
+	gid_t gid = 0;
+	
+	if (user)
+	{
+		errno = 0;
+		struct passwd *pass = getpwnam(user);
+		if (!pass)
+		{
+			fprintf(stderr, "Cannot getpwnam %s: %s\n", user, strerror(errno));
+			return 1;
+		}
+		uid = pass->pw_uid;
+		
+		// Save on one syscall at least.
+		if (group && !strcmp(user, group))
+		{
+			gid = pass->pw_gid;
+			goto perms;
+		}
+	}
+	
+	if (group)
+	{
+		errno = 0;
+		struct group *grp = getgrnam(group);
+		if (!grp)
+		{
+			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
+			return 1;
+		}
+		
+		gid = grp->gr_gid;
+	}
+	
+perms:
+	if (chown(file, uid, gid) == -1)
+	{
+		fprintf(stderr, "Failed to set owner on file %s to %s %s: %s\n", file, user, group, strerror(errno));
+		return 1;
+	}
+	
+	if (chmod(file, permissions) == -1)
+	{
+		fprintf(stderr, "Failed to set permissions on file %s to %.4d\n", file, permissions);
+		return 1;
 	}
 	
 	return 0;

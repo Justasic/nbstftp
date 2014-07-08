@@ -15,6 +15,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdarg.h>
+#include <sys/types.h>
 #include "reallocarray.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -30,4 +31,5 @@ extern void die(const char *, ...) __attribute__ ((noreturn));
 extern int SwitchUserAndGroup(const char *user, const char *group);
 extern void Daemonize(void);
 extern int vasprintf(char **str, const char *fmt, va_list args);
+extern int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions);
 
