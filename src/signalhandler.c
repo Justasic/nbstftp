@@ -17,6 +17,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <signal.h>
+#include <stdlib.h>
 
 extern char *configfile;
 extern int running;
@@ -40,8 +41,15 @@ static void SignalHandler(int sig)
 			break;
 		}
 		case SIGSEGV:
+                {
+                        static int cnt = 0;
+                        // Double segfault
+                        if (cnt++ >= 1)
+                                exit(1);
+
 			fprintf(stderr, "FATAL: well.. shit. We have a Segmentation Fault. Best whip out the debugger...\n");
 			break;
+                }
 		case SIGTERM:
 		case SIGINT:
 // 			signal(sig, SIG_IGN);

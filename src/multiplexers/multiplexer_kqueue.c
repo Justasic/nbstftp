@@ -41,9 +41,9 @@ typedef unsigned int u_int;
 typedef struct kevent kevent_t;
 
 static int KqueueHandle = -1;
-static kevent_t *events, *changed;
+static kevent_t *events = NULL, *changed = NULL;
 static size_t events_len = 5, changed_len = 5;
-static unsigned int changedSz;
+static unsigned int changedSz = 0;
 // Default kqueue idle time, will be changed on init
 static struct timespec kqtime = {5, 0};
 
@@ -179,10 +179,9 @@ void ProcessSockets(void)
 			events = newptr;
 		}
 	}
-	//printf("Entering kevent\n");
-    errno = 0;
+	printf("Entering kevent\n");
 	
-	int total = kevent(KqueueHandle, changed, changed_len, events, events_len, &kqtime);
+	int total = kevent(KqueueHandle, changed, changedSz, events, events_len, &kqtime);
 	changedSz = 0;
 
     //printf("kqueue returend %d\n", total);
