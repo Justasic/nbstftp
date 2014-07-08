@@ -22,8 +22,8 @@ enum
 	SF_READABLE = 2
 };
 
-extern int AddToMultiplexer(int fd);
-extern int RemoveFromMultiplexer(int fd);
+extern int AddToMultiplexer(socket_t *s);
+extern int RemoveFromMultiplexer(socket_t *s);
 extern int SetSocketStatus(socket_t *s, int status);
 
 extern int InitializeMultiplexer(void);

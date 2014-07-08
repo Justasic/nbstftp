@@ -39,32 +39,33 @@ static int EpollHandle = -1;
 static epoll_t *events;
 static size_t events_len = 5;
 
-int AddToMultiplexer(int fd)
+int AddToMultiplexer(socket_t *s)
 {
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
 	
 	ev.events = EPOLLIN;
-	ev.data.fd = fd;
+	ev.data.fd = s->fd;
+    s->flags = SF_READABLE;
 	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, fd, &ev) == -1)
+	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, s->fd, &ev) == -1)
 	{
-		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", fd, strerror(errno));
+		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", s->fd, strerror(errno));
 		return -1;
 	}
 	
 	return 0;
 }
 
-int RemoveFromMultiplexer(int fd)
+int RemoveFromMultiplexer(socket_t *s)
 {
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
-	ev.data.fd = fd;
+	ev.data.fd = s->fd;
 	
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_DEL, ev.data.fd, &ev) == -1)
 	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", fd, strerror(errno));
+		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s->fd, strerror(errno));
 		return -1;
 	}
 	
@@ -78,7 +79,7 @@ int SetSocketStatus(socket_t *s, int status)
 	
 	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
 	ev.data.fd = s->fd;
-	s->flags = ev.events;
+	s->flags = status;
 	
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
 	{

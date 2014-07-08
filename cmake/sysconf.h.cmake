@@ -55,9 +55,9 @@
 #cmakedefine HAVE_UINT32_T 1
 #cmakedefine HAVE_U_INT32_T 1
 
-#ifdef HAVE_SETJMP_H
-# include <setjmp.h>
-#endif
+//#ifdef HAVE_SETJMP_H
+//# include <setjmp.h>
+//#endif
 #ifdef HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif

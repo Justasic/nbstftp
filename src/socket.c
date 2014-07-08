@@ -95,16 +95,6 @@ int BindToSocket(const char *addr, short port)
 
 socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding)
 {
-	// Add it to the multiplexer
-	if (binding)
-	{
-		if (AddToMultiplexer(fd) == -1)
-		{
-			close(fd);
-			return NULL;
-		}
-	}
-	
 	if (!addr)
 		addr = inet_ntoa(saddr.in.sin_addr);
 	
@@ -112,8 +102,20 @@ socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, u
 	sock->bindaddr = strdup(addr);
 	sock->type = saddr.sa.sa_family;
 	sock->fd = fd;
-	sock->flags = 1;
+	sock->flags = 0;
 	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
+
+    // Add it to the multiplexer
+	if (binding)
+	{
+        printf("Adding to multiplexer!\n");
+		if (AddToMultiplexer(sock) == -1)
+		{
+			close(fd);
+            free(sock);
+			return NULL;
+		}
+	}
 	
 	vec_push(&socketpool, sock);
 	// Make sure we could add the socket.
@@ -156,7 +158,7 @@ short GetPort(socket_t *s)
 void DestroySocket(socket_t *s, uint8_t closefd)
 {
 	// First, remove it from the EPoll system.
-	RemoveFromMultiplexer(s->fd);
+	RemoveFromMultiplexer(s);
 
 	// Now remove it from our vector
 	vec_remove(&socketpool, s);

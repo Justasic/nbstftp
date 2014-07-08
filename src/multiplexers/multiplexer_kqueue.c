@@ -24,10 +24,18 @@
 #include "client.h"
 #include "process.h"
 
+#include <stdint.h>
 #include <sys/types.h>
-#include <sys/event.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <unistd.h>
+#include <assert.h>
+
+/* Not sure why these break but whatever. */
+typedef unsigned short u_short;
+typedef unsigned int u_int;
+
+#include <sys/event.h>
 
 // Make it easier
 typedef struct kevent kevent_t;
@@ -36,6 +44,8 @@ static int KqueueHandle = -1;
 static kevent_t *events, *changed;
 static size_t events_len = 5, changed_len = 5;
 static unsigned int changedSz;
+// Default kqueue idle time, will be changed on init
+static struct timespec kqtime = {5, 0};
 
 static inline kevent_t *GetChangeEvent(void)
 {
@@ -47,42 +57,74 @@ static inline kevent_t *GetChangeEvent(void)
 		{
 			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
 				strerror(errno));
+            return NULL;
 		}
 		else
 		{
 			changed_len *= 2;
 			changed = newptr;
+            return NULL;
 		}
 	}
 	
 	return &changed[changedSz++];
 }
 
-int AddToMultiplexer(int fd)
+int AddToMultiplexer(socket_t *s)
 {
-	kevent_t *event = GetChangeEvent();
-	EV_SET(event, fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+    // Set the socket as readable and add it to kqueue
+    return SetSocketStatus(s, SF_READABLE);
 }
 
-int RemoveFromMultiplexer(int fd)
+int RemoveFromMultiplexer(socket_t *s)
 {
-	kevent_t *event = GetChangeEvent();
-	EV_SET(event, fd, 0, EV_DELETE, 0, 0, NULL);
+    // It is easier to just set the socket status to 0, the if statements
+    // in the next func below will take care of everything.
+    return SetSocketStatus(s, 0);
 }
 
 int SetSocketStatus(socket_t *s, int status)
 {
-	kevent_t *event = GetChangeEvent();
-	
-	int mod = 0;
-	if (status & SF_READABLE)
-		mod = EVFILT_READ;
-	else if (status & SF_WRITABLE)
-		mod = EVFILT_WRITE;
-	else
-		return;
-	
-	EV_SET(event, s->fd, mod, EV_ADD, 0, 0, NULL);
+    assert(s);
+
+	kevent_t *event;
+
+    printf("Setting socket status %d (%d)\n", status, s->flags);
+    
+    if (status & SF_READABLE && !(s->flags & SF_READABLE))
+    {
+        printf("Setting readable (previously was not readbale)\n");
+        event = GetChangeEvent();
+        EV_SET(event, s->fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    }
+
+    if (!(status & SF_READABLE) && s->flags & SF_READABLE)
+    {
+        printf("Removing readable (previously was readable)\n");
+        event = GetChangeEvent();
+        EV_SET(event, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    }
+
+    if (status & SF_WRITABLE && !(s->flags & SF_WRITABLE))
+    {
+        printf("Setting writable (previously was not writable)\n");
+        event = GetChangeEvent();
+        EV_SET(event, s->fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+    }
+
+    if (!(status & SF_WRITABLE) && s->flags & SF_WRITABLE)
+    {
+        printf("Removing writable (previously was writable)\n");
+        event = GetChangeEvent();
+        EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    }
+
+    sleep(5);
+
+
+    s->flags = status;
+
+    return 0;
 }
 
 int InitializeMultiplexer(void)
@@ -106,6 +148,9 @@ int InitializeMultiplexer(void)
 		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
 		return -1;
 	}
+
+    // Set kqueue idle timeout from config
+    kqtime.tv_sec = config->readtimeout;
 	
 	return 0;
 }
@@ -115,6 +160,8 @@ int ShutdownMultiplexer(void)
 	close(KqueueHandle);
 	free(changed);
 	free(events);
+
+    return 0;
 }
 
 extern socket_vec_t socketpool;
@@ -137,9 +184,10 @@ void ProcessSockets(void)
 	}
 	printf("Entering kevent\n");
 	
-	static struct timespec kqtime = { Config->ReadTimeout, 0 };
 	int total = kevent(KqueueHandle, changed, changed_len, events, events_len, &kqtime);
 	changedSz = 0;
+
+    printf("kqueue returend %d\n", total);
 	
 	if (total == -1)
 	{
@@ -161,12 +209,15 @@ void ProcessSockets(void)
 		kevent_t *ev = &events[i];
 		
 		if (ev->flags & EV_ERROR)
+        {
+            printf("EV_ERROR.\n");
 			continue;
+        }
 		
 		socket_t *s = FindSocket(ev->ident);
 		if (!s)
 		{
-			printf("Could not find socket %d\n", ev->ident);
+			printf("Could not find socket %lu\n", ev->ident);
 			continue;
 		}
 		
@@ -178,7 +229,7 @@ void ProcessSockets(void)
 		}
 		
 		// process socket read events.
-		if (ev->filter & FVFILT_READ)
+		if (ev->filter & EVFILT_READ)
 		{
 // 			printf("Received read on socket %d port %d\n", s->fd, GetPort(s));
 			socketstructs_t ss;
@@ -215,7 +266,7 @@ void ProcessSockets(void)
 		}
 		
 		// Process socket write events
-		if (ev->filter & FVFILT_WRITE && SendPackets() == -1)
+		if (ev->filter & EVFILT_WRITE && SendPackets() == -1)
 		{
 			printf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
