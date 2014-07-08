@@ -28,7 +28,6 @@ static void PrintHelp(void)
 	fprintf(stderr, "\nOptions:\n");
 	fprintf(stderr, "-f, --nofork        Do not daemonize (don't fork to background)\n");
 	fprintf(stderr, "-c, --config        Specify a config file\n");
-	fprintf(stderr, "-p, --port          Specify a port to listen on\n");
 	fprintf(stderr, "-h, --help          This message\n");
 	fprintf(stderr, "-l, --license       Print license message\n");
 	fprintf(stderr, "-v, --version       Print version information\n");
@@ -90,15 +89,6 @@ void HandleArguments(int argc, char **argv)
 				}
 				wait_for_conf = 1;
 			}
-			else if (!strcasecmp(arg, "port"))
-			{
-				if (i+1 >= argc)
-				{
-					fprintf(stderr, "You must specify a port!\n");
-					exit(EXIT_FAILURE);
-				}
-				wait_for_port = 1;
-			}
 			else
 			{
 				fprintf(stderr, "Unknown argument: \"%s\"\n", arg);
@@ -127,15 +117,6 @@ void HandleArguments(int argc, char **argv)
 				}
 				wait_for_conf = 1;
 			}
-			else if (!strcasecmp(arg, "p"))
-			{
-				if (i+1 >= argc)
-				{
-					fprintf(stderr, "You must specify a port!\n");
-					exit(EXIT_FAILURE);
-				}
-				wait_for_port = 1;
-			}
 			else
 			{
 				fprintf(stderr, "Unknown argument: \"%s\"\n", arg);
@@ -147,8 +128,6 @@ void HandleArguments(int argc, char **argv)
 			// Copy the config file
 			if (wait_for_conf)
 				configfile = arg;
-			else if (wait_for_port)
-				port = atoi(arg);
 		}
 	}
 }

@@ -10,6 +10,7 @@ extern int yylex();
 extern void yyerror(const char *s);
 
 config_t *config;
+listen_t *curblock;
 %}
 
 %error-verbose
@@ -34,42 +35,64 @@ config_t *config;
 %token PIDFILE
 %token DAEMONIZE
 %token READTIMEOUT
+%token LISTEN
 
 
 %%
 
 conf: | conf conf_items;
 
-conf_items: server_entry;
+conf_items: server_entry | listen_entry;
+
+listen_entry: LISTEN
+{
+	listen_t *block = nmalloc(sizeof(listen_t));
+	block->port = -1;
+	block->bindaddr = NULL;
+	
+	curblock = block;
+	
+	if (!config)
+	{
+		config = nmalloc(sizeof(config_t));
+		config->daemonize = -1;
+		config->readtimeout = 5;
+		vec_init(&config->listenblocks);
+	}
+	
+	vec_push(&config->listenblocks, block);
+}
+'{' listen_items '}';
 
 server_entry: SERVER
 {
 	config = nmalloc(sizeof(config_t));
 	// Defaults
-	config->port = -1;
 	config->daemonize = 1;
 	config->readtimeout = 5;
+	vec_init(&config->listenblocks);
 }
 '{' server_items '}';
 
 server_items: | server_item server_items;
-server_item: server_bind | server_port | server_directory | server_user | server_group | server_daemonize |
-server_pidfile | server_readtimeout;
+server_item: server_directory | server_user | server_group | server_daemonize | server_pidfile | server_readtimeout;
 
+listen_items: | listen_item listen_items;
+listen_item: listen_bind | listen_port;
 
-server_bind: BIND '=' STR ';'
+listen_bind: BIND '=' STR ';'
 {
-	config->bindaddr = strdup(yylval.sval);
-	if (!config->bindaddr)
+	curblock->bindaddr = strdup(yylval.sval);
+	if (!curblock->bindaddr)
 	{
 		fprintf(stderr, "Failed to parse config: %s\n", strerror(errno));
 		exit(1);
 	}
 };
 
-server_port: PORT '=' CINT ';'
+listen_port: PORT '=' CINT ';'
 {
-	config->port = yylval.ival;
+	curblock->port = yylval.ival;
 };
 
 server_directory: DIRECTORY '=' STR ';'

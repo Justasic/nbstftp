@@ -44,10 +44,20 @@ int ParseConfig(const char *filename)
 #ifndef NDEBUG
 	printf("Config:\n");
 	if (config)
-		printf(" Bind: %s\n Port: %d\n Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n"
+	{
+		printf(" Directory: %s\n User: %s\n Group: %s\n Daemonize: %d\n"
 			" Pidfile: %s\n Read Timeout: %d\n",
-			config->bindaddr, config->port, config->directory, config->user, config->group,
-			config->daemonize, config->pidfile, config->readtimeout);
+			config->directory, config->user, config->group, config->daemonize, config->pidfile,
+			config->readtimeout);
+		
+		listen_t *block;
+		int i = 0;
+		vec_foreach(&config->listenblocks, block, i)
+		{
+			printf("Listening On:\n Bind: %s\n Port: %d\n", block->bindaddr, block->port);
+		}
+		
+	}
 	else
 		printf(" Config is null!\n");
 #endif
@@ -64,14 +74,6 @@ int ParseConfig(const char *filename)
 		return 1;
 	}
 
-	// Default is to listen on all interfaces
-	if (!config->bindaddr)
-		config->bindaddr = "0.0.0.0";
-
-	// Default is to use port 69
-	if (config->port == -1 || config->port == 0)
-		config->port = 69;
-
 	if (!config->pidfile)
 		config->pidfile = "/var/run/nbstftp.pid";
 
@@ -81,18 +83,24 @@ int ParseConfig(const char *filename)
 		config->readtimeout = 5;
 	}
 
-
 	return ret;
 }
 
 void DeallocateConfig(config_t *conf)
 {
 	if (!config)
-		return; 
+		return;
 
 	// Clear memory.
-	if (conf->bindaddr)
-		free(conf->bindaddr);
+	listen_t *block;
+	int i = 0;
+	vec_foreach(&config->listenblocks, block, i)
+	{
+		free(block->bindaddr);
+		free(block);
+	}
+	
+	vec_deinit(&config->listenblocks);
 
 	if (conf->user)
 		free(conf->user);

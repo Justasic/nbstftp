@@ -89,32 +89,26 @@ int SetSocketStatus(socket_t *s, int status)
 
 	kevent_t *event;
 
-	printf("Setting socket status %d (%d)\n", status, s->flags);
-
 	if (status & SF_READABLE && !(s->flags & SF_READABLE))
 	{
-		printf("Setting readable (previously was not readbale)\n");
 		event = GetChangeEvent();
 		EV_SET(event, s->fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 	}
 
 	if (!(status & SF_READABLE) && s->flags & SF_READABLE)
 	{
-		printf("Removing readable (previously was readable)\n");
 		event = GetChangeEvent();
 		EV_SET(event, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 	}
 
 	if (status & SF_WRITABLE && !(s->flags & SF_WRITABLE))
 	{
-		printf("Setting writable (previously was not writable)\n");
 		event = GetChangeEvent();
 		EV_SET(event, s->fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
 	}
 
 	if (!(status & SF_WRITABLE) && s->flags & SF_WRITABLE)
 	{
-		printf("Removing writable (previously was writable)\n");
 		event = GetChangeEvent();
 		EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
 	}

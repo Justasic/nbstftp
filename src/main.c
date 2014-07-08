@@ -27,8 +27,6 @@
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 int running = 1;
-short port = -1;
-
 // Fork to background unless otherwise specified
 int nofork = -1;
 char *configfile = NULL;
@@ -87,30 +85,18 @@ int main(int argc, char **argv)
 		configfile = "nbstftp.conf";
 
 	if (ParseConfig(configfile) != 0)
-		die("FATAL: Failed to parse the config file!");
+		die("Failed to parse the config file!");
 	
 	// Write the PID file -- Also check for any other
 	// running versions of us.
 	WritePID();
 	
-	// if the user didn't specify a port on the command line already
-	// use our own from the config or use the default (also from the
-	// config)
-	if (port == -1)
-		port = config->port;
-	
-	// Initialize the socket system.
-	InitializeSockets();
-	
 	// Initialize the client pool
 	vec_init(&clientpool);
 	
-	// TODO: Get list of sockets from config and bind them.
-	if (BindToSocket(config->bindaddr, port) == -1)
-	{
-		fprintf(stderr, "Failed to bind to socket!\n");
-		goto cleanup;
-	}
+	// Initialize the socket system.
+	if (InitializeSockets() == -1)
+		die("Failed to initialize and bind to the interfaces!");
 
 	// Change the user and group id.
 	if (SwitchUserAndGroup(config->user, config->group) == 1)

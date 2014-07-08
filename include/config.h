@@ -13,18 +13,28 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #pragma once
+#include "vec.h"
+
+typedef struct listen_s
+{
+	char *bindaddr;
+	short port;
+} listen_t;
+
+typedef vec_t(listen_t*) listen_vec_t;
 
 typedef struct config_s
 {
-        char *bindaddr;
-        short port;
-        char *directory;
-        char *user;
-        char *group;
+	char *directory;
+	char *user;
+	char *group;
 	char *pidfile;
-        char daemonize;
+	char daemonize;
 	int readtimeout;
+	listen_vec_t listenblocks;
 } config_t;
+
+
 
 // Defined in parser.y
 extern config_t *config;

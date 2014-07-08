@@ -184,11 +184,33 @@ int InitializeSockets(void)
 		fprintf(stderr, "Failed to allocate socket pool!\n");
 		return -1;
 	}
-
-// 	// TODO: Get list of sockets from config
-// 	if (BindToSocket(config->bindaddr, port) == -1)
-// 		return -1;
-
+	
+	listen_t *block;
+	int i = 0, bound = 0;
+	vec_foreach(&config->listenblocks, block, i)
+	{
+		// Our defaults if they didn't specify them.
+		if (block->port == -1)
+			block->port = 69;
+		
+		if (!block->bindaddr)
+			block->bindaddr = "0.0.0.0";
+		
+		if (BindToSocket(block->bindaddr, block->port) == -1)
+		{
+			fprintf(stderr, "Failed to bind to %s:%d\n", block->bindaddr, block->port);
+			continue;
+		}
+		bound = 1;
+	}
+	
+	// If we didn't find an interface to bind to, exit.
+	if (!bound)
+	{
+		fprintf(stderr, "Failed to find an interface to bind to!\n");
+		return -1;
+	}
+	
 	return 0;
 }
 

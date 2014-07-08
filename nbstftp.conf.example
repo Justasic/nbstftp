@@ -12,12 +12,6 @@
 // Server configuration
 server
 {
-        // Address to bind to (optional)
-        bind = "192.168.0.140";
-        
-        // Port to listen on (69 by default)
-        //port = 69;
-
         // Directory to serve (manditory)
         directory = "/tftpboot/";
 
@@ -38,4 +32,14 @@ server
 	// seconds. The lower the seconds, the faster the program will respond to
 	// events but the more CPU it will use. (default is 5 seconds).
 	readtimeout = 5;
+}
+
+// Listen block, Add as many as you need.
+listen
+{
+	// Address to bind to (optional)
+	bind = "192.168.0.140";
+	
+	// Port to listen on (69 by default)
+	//port = 69;
 }
