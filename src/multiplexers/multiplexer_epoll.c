@@ -46,7 +46,7 @@ int AddToMultiplexer(socket_t *s)
 	
 	ev.events = EPOLLIN;
 	ev.data.fd = s->fd;
-    s->flags = SF_READABLE;
+	s->flags = SF_READABLE;
 	
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, s->fd, &ev) == -1)
 	{
@@ -117,7 +117,6 @@ void ProcessSockets(void)
 {
 	if (socketpool.length > events_len)
 	{
-		printf("Resizing array to support events_len\n");
 		epoll_t *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
 		if (!newptr)
 		{
@@ -155,10 +154,7 @@ void ProcessSockets(void)
 		
 		socket_t *s = FindSocket(ev->data.fd);
 		if (!s)
-		{
-			printf("Could not find socket %d\n", ev->data.fd);
 			continue;
-		}
 		
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{

@@ -105,14 +105,13 @@ socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, u
 	sock->flags = 0;
 	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
 
-    // Add it to the multiplexer
+	// Add it to the multiplexer
 	if (binding)
 	{
-        printf("Adding to multiplexer!\n");
 		if (AddToMultiplexer(sock) == -1)
 		{
 			close(fd);
-            free(sock);
+			free(sock);
 			return NULL;
 		}
 	}

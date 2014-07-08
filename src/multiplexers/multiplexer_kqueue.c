@@ -57,13 +57,13 @@ static inline kevent_t *GetChangeEvent(void)
 		{
 			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
 				strerror(errno));
-            return NULL;
+			return NULL;
 		}
 		else
 		{
 			changed_len *= 2;
 			changed = newptr;
-            return NULL;
+			return NULL;
 		}
 	}
 	
@@ -72,56 +72,56 @@ static inline kevent_t *GetChangeEvent(void)
 
 int AddToMultiplexer(socket_t *s)
 {
-    // Set the socket as readable and add it to kqueue
-    return SetSocketStatus(s, SF_READABLE);
+	// Set the socket as readable and add it to kqueue
+	return SetSocketStatus(s, SF_READABLE);
 }
 
 int RemoveFromMultiplexer(socket_t *s)
 {
-    // It is easier to just set the socket status to 0, the if statements
-    // in the next func below will take care of everything.
-    return SetSocketStatus(s, 0);
+	// It is easier to just set the socket status to 0, the if statements
+	// in the next func below will take care of everything.
+	return SetSocketStatus(s, 0);
 }
 
 int SetSocketStatus(socket_t *s, int status)
 {
-    assert(s);
+	assert(s);
 
 	kevent_t *event;
 
-    printf("Setting socket status %d (%d)\n", status, s->flags);
-    
-    if (status & SF_READABLE && !(s->flags & SF_READABLE))
-    {
-        printf("Setting readable (previously was not readbale)\n");
-        event = GetChangeEvent();
-        EV_SET(event, s->fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    }
+	printf("Setting socket status %d (%d)\n", status, s->flags);
 
-    if (!(status & SF_READABLE) && s->flags & SF_READABLE)
-    {
-        printf("Removing readable (previously was readable)\n");
-        event = GetChangeEvent();
-        EV_SET(event, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    }
+	if (status & SF_READABLE && !(s->flags & SF_READABLE))
+	{
+		printf("Setting readable (previously was not readbale)\n");
+		event = GetChangeEvent();
+		EV_SET(event, s->fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+	}
 
-    if (status & SF_WRITABLE && !(s->flags & SF_WRITABLE))
-    {
-        printf("Setting writable (previously was not writable)\n");
-        event = GetChangeEvent();
-        EV_SET(event, s->fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-    }
+	if (!(status & SF_READABLE) && s->flags & SF_READABLE)
+	{
+		printf("Removing readable (previously was readable)\n");
+		event = GetChangeEvent();
+		EV_SET(event, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+	}
 
-    if (!(status & SF_WRITABLE) && s->flags & SF_WRITABLE)
-    {
-        printf("Removing writable (previously was writable)\n");
-        event = GetChangeEvent();
-        EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    }
+	if (status & SF_WRITABLE && !(s->flags & SF_WRITABLE))
+	{
+		printf("Setting writable (previously was not writable)\n");
+		event = GetChangeEvent();
+		EV_SET(event, s->fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+	}
 
-    s->flags = status;
+	if (!(status & SF_WRITABLE) && s->flags & SF_WRITABLE)
+	{
+		printf("Removing writable (previously was writable)\n");
+		event = GetChangeEvent();
+		EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+	}
 
-    return 0;
+	s->flags = status;
+
+	return 0;
 }
 
 int InitializeMultiplexer(void)
@@ -146,8 +146,8 @@ int InitializeMultiplexer(void)
 		return -1;
 	}
 
-    // Set kqueue idle timeout from config
-    kqtime.tv_sec = config->readtimeout;
+	// Set kqueue idle timeout from config
+	kqtime.tv_sec = config->readtimeout;
 	
 	return 0;
 }
@@ -158,7 +158,7 @@ int ShutdownMultiplexer(void)
 	free(changed);
 	free(events);
 
-    return 0;
+	return 0;
 }
 
 extern socket_vec_t socketpool;
@@ -166,7 +166,6 @@ void ProcessSockets(void)
 {
 	if (socketpool.length > events_len)
 	{
-		printf("Resizing array to support events_len\n");
 		kevent_t *newptr = reallocarray(events, events_len * 2, sizeof(kevent_t));
 		if (!newptr)
 		{
@@ -184,7 +183,6 @@ void ProcessSockets(void)
 	int total = kevent(KqueueHandle, changed, changedSz, events, events_len, &kqtime);
 	changedSz = 0;
 
-    //printf("kqueue returend %d\n", total);
 	
 	if (total == -1)
 	{
@@ -204,10 +202,7 @@ void ProcessSockets(void)
 		
 		socket_t *s = FindSocket(ev->ident);
 		if (!s)
-		{
-			printf("Could not find socket %lu (%s)\n", ev->ident, strerror(errno));
 			continue;
-		}
 		
 		if (ev->flags & EV_EOF)
 		{

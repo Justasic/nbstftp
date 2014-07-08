@@ -54,9 +54,9 @@ reallocarray(void *optr, size_t nmemb, size_t size)
 		errno = ENOMEM;
 		return NULL;
 	}
-        void *ptr = realloc(optr, size * nmemb);
-        if (ptr)
-                memset(ptr, 0, size * nmemb);
+	void *ptr = realloc(optr, size * nmemb);
+	if (ptr)
+		memset(ptr, 0, size * nmemb);
 	return ptr; 
 }
 #endif

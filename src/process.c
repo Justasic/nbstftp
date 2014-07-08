@@ -57,7 +57,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 #ifdef HAVE_STRNDUPA
 			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
 #else
-            const char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
+			const char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
 #endif
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 
@@ -79,7 +79,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			}
 
 #ifndef HAVE_STRNDUPA
-            free(error);
+			free(error);
 #endif
 
 			break;
@@ -117,7 +117,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
 			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #else
-         	const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+			const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
 			const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #endif
 
@@ -125,8 +125,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
 
 #ifndef HAVE_STRNDUPA
-            free(filename);
-            free(mode);
+			free(filename);
+			free(mode);
 #endif
 			break;
 		}
@@ -145,8 +145,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// null byte which strlen does not include.
 			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #else
-            const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
-            const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+			const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #endif
 			
 			// mode can be "netascii", "octet", or "mail" case insensitive.
@@ -187,8 +187,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			SendData(c, buf, readlen);
 
 #ifndef HAVE_STRNDUPA
-            free(filename);
-            free(mode);
+			free(filename);
+			free(mode);
 #endif
 
 			break;
