@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 /*
  * This is sqrt(SIZE_MAX+1), as s1*s2 <= SIZE_MAX
@@ -53,6 +54,8 @@ reallocarray(void *optr, size_t nmemb, size_t size)
 		errno = ENOMEM;
 		return NULL;
 	}
-	return realloc(optr, size * nmemb);
+    void *ptr = realloc(optr, size * nmemb);
+    memset(ptr, 0, size * nmemb);
+	return ptr; 
 }
 #endif

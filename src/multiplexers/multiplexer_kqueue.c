@@ -119,9 +119,6 @@ int SetSocketStatus(socket_t *s, int status)
         EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     }
 
-    sleep(5);
-
-
     s->flags = status;
 
     return 0;
@@ -182,23 +179,18 @@ void ProcessSockets(void)
 			events = newptr;
 		}
 	}
-	printf("Entering kevent\n");
+	//printf("Entering kevent\n");
+    errno = 0;
 	
 	int total = kevent(KqueueHandle, changed, changed_len, events, events_len, &kqtime);
 	changedSz = 0;
 
-    printf("kqueue returend %d\n", total);
+    //printf("kqueue returend %d\n", total);
 	
 	if (total == -1)
 	{
 		if (errno != EINTR)
 		{
-			if (errno == EFAULT)
-			{
-				fprintf(stderr, "EFAULT\n");
-				exit(1);
-			}
-			else
 				fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
 		}
 		return;
@@ -209,15 +201,12 @@ void ProcessSockets(void)
 		kevent_t *ev = &events[i];
 		
 		if (ev->flags & EV_ERROR)
-        {
-            printf("EV_ERROR.\n");
 			continue;
-        }
 		
 		socket_t *s = FindSocket(ev->ident);
 		if (!s)
 		{
-			printf("Could not find socket %lu\n", ev->ident);
+			printf("Could not find socket %lu (%s)\n", ev->ident, strerror(errno));
 			continue;
 		}
 		
