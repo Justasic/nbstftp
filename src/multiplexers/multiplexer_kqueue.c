@@ -18,11 +18,13 @@
 # error You probably shouldn't be trying to compile a kqueue multiplexer on a kqueue-unsupported platform. Try again.
 #endif
 
+#include "multiplexer.h"
 #include "socket.h"
 #include "misc.h"
 #include "config.h"
 #include "client.h"
 #include "process.h"
+#include "vec.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -37,36 +39,19 @@ typedef unsigned int u_int;
 
 #include <sys/event.h>
 
+static int KqueueHandle = -1;
 // Make it easier
 typedef struct kevent kevent_t;
-
-static int KqueueHandle = -1;
-static kevent_t *events = NULL, *changed = NULL;
-static size_t events_len = 5, changed_len = 5;
-static unsigned int changedSz = 0;
+vec_t(kevent_t) events, changed;
 // Default kqueue idle time, will be changed on init
 static struct timespec kqtime = {5, 0};
 
 static inline kevent_t *GetChangeEvent(void)
 {
-	if (changedSz == changed_len)
-	{
-		printf("Resizing array to support changed_len\n");
-		kevent_t *newptr = reallocarray(changed, changed_len * 2, sizeof(kevent_t));
-		if (!newptr)
-		{
-			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
-				strerror(errno));
-			return NULL;
-		}
-		else
-		{
-			changed_len *= 2;
-			changed = newptr;
-		}
-	}
+	if (changed.length == changed.capacity)
+		vec_reserve(&changed, changed.length * 2);
 	
-	return &changed[changedSz++];
+	return &(changed.data[changed.length++]);
 }
 
 int AddToMultiplexer(socket_t *s)
@@ -124,24 +109,18 @@ int InitializeMultiplexer(void)
 		fprintf(stderr, "Unable to create kqueue handle: %s\n", strerror(errno));
 		return -1;
 	}
+
+	// Initialize
+	vec_init(&events);
+	vec_init(&changed);
 	
-	events = reallocarray(NULL, events_len, sizeof(kevent_t));
-	if (!events)
-	{
-		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
-		return -1;
-	}
+	// Reserve some initial space
+	vec_reserve(&events, 5);
+	vec_reserve(&changed, 5);
 	
-	changed = reallocarray(NULL, changed_len, sizeof(kevent_t));
-	if (!changed)
-	{
-		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
-		return -1;
-	}
-	
-	// Initialize everything
-	memset(changed, 0, sizeof(kevent_t) * changed_len);
-	memset(events, 0, sizeof(kevent_t) * events_len);
+	// Reinitialize the arrays.
+	memset(events.data, 0, sizeof(kevent_t) * 5);
+	memset(changed.data, 0, sizeof(kevent_t) * 5);
 
 	// Set kqueue idle timeout from config
 	kqtime.tv_sec = config->readtimeout;
@@ -152,46 +131,36 @@ int InitializeMultiplexer(void)
 int ShutdownMultiplexer(void)
 {
 	close(KqueueHandle);
-	free(changed);
-	free(events);
+	
+	vec_deinit(&events);
+	vec_deinit(&changed);
 
 	return 0;
 }
 
+extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
-	if (socketpool.length > events_len)
-	{
-		kevent_t *newptr = reallocarray(events, events_len * 2, sizeof(kevent_t));
-		if (!newptr)
-		{
-			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
-				strerror(errno));
-		}
-		else
-		{
-			events_len *= 2;
-			events = newptr;
-		}
-	}
+	if (socketpool.length > events.capacity)
+		vec_reserve(&events, socketpool.length * 2);
+	
 	printf("Entering kevent\n");
 	
-	int total = kevent(KqueueHandle, changed, changedSz, events, events_len, &kqtime);
-	changedSz = 0;
-
+	int total = kevent(KqueueHandle, &vec_first(&changed), changed.length, &vec_first(&events), events.capacity, &kqtime);
+	
+	// Reset the changed count.
+	vec_clear(&changed);
 	
 	if (total == -1)
 	{
 		if (errno != EINTR)
-		{
 			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
-		}
 		return;
 	}
 	
 	for (int i = 0; i < total; ++i)
 	{
-		kevent_t *ev = &events[i];
+		kevent_t *ev = &(events.data[i]);
 		
 		if (ev->flags & EV_ERROR)
 			continue;

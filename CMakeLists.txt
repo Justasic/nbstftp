@@ -123,21 +123,23 @@ check_include_file(stddef.h HAVE_STDDEF_H)
 if (HAVE_SYS_EPOLL_H)
     list(APPEND SOURCE_FILES src/multiplexers/multiplexer_epoll.c)
 else (HAVE_SYS_EPOLL_H)
-    # Okay, we don't have epoll, lets try poll.
-    if (HAVE_POLL)
-        list(APPEND SOURCE_FILES src/multiplexers/multiplexer_poll.c)
-    else (HAVE_POLL)
-        # Okay, so this system doesn't have poll, let's try kqueue.
-        if (HAVE_KQUEUE)
-            list(APPEND SOURCE_FILES src/multiplexers/multiplexer_kqueue.c)
-        else (HAVE_KQUEUE)
+    # Okay, so this system doesn't have epoll, let's try kqueue.
+    if (HAVE_KQUEUE)
+        list(APPEND SOURCE_FILES src/multiplexers/multiplexer_kqueue.c)
+    else (HAVE_KQUEUE)
+        # Okay, we don't have kqueue, lets try poll.
+        if (HAVE_POLL)
+            list(APPEND SOURCE_FILES src/multiplexers/multiplexer_poll.c)
+        else (HAVE_POLL)
+            # alright, we'll give in and try select.
             if (HAVE_SELECT)
                 list(APPEND SOURCE_FILES src/multiplexers/multiplexer_select.c)
             else (HAVE_SELECT)
+                # wtf? are we on MS-DOS?
                 message(FATAL_ERROR "Cannot find a compatible multiplexer for this platform, please file a bug.")
             endif (HAVE_SELECT)
-        endif(HAVE_KQUEUE)
-    endif(HAVE_POLL)
+        endif(HAVE_POLL)
+    endif(HAVE_KQUEUE)
 endif (HAVE_SYS_EPOLL_H)
 
 # Because strndupa is apparnetly not a function or some shit, we must
