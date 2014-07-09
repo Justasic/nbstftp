@@ -110,6 +110,8 @@ check_type_size(u_int64_t HAVE_U_INT64_T)
 #check_function_exists(strndupa HAVE_STRNDUPA)
 check_function_exists(strnlen HAVE_STRNLEN)
 check_function_exists(kqueue HAVE_KQUEUE)
+check_function_exists(select HAVE_SELECT)
+check_function_exists(poll HAVE_POLL)
 
 check_include_file(sys/epoll.h HAVE_SYS_EPOLL_H)
 check_include_file(setjmp.h HAVE_SETJMP_H)
@@ -117,14 +119,26 @@ check_include_file(sys/types.h HAVE_SYS_TYPES_H)
 check_include_file(stdint.h HAVE_STDINT_H)
 check_include_file(stddef.h HAVE_STDDEF_H)
 
-# If epoll is found, append it.
+Find our multiplexer, choose the best one possible.
 if (HAVE_SYS_EPOLL_H)
     list(APPEND SOURCE_FILES src/multiplexers/multiplexer_epoll.c)
+else (HAVE_SYS_EPOLL_H)
+    # Okay, we don't have epoll, lets try poll.
+    if (HAVE_POLL)
+        list(APPEND SOURCE_FILES src/multiplexers/multiplexer_poll.c)
+    else (HAVE_POLL)
+        # Okay, so this system doesn't have poll, let's try kqueue.
+        if (HAVE_KQUEUE)
+            list(APPEND SOURCE_FILES src/multiplexers/multiplexer_kqueue.c)
+        else (HAVE_KQUEUE)
+            if (HAVE_SELECT)
+                list(APPEND SOURCE_FILES src/multiplexers/multiplexer_select.c)
+            else (HAVE_SELECT)
+                message(FATAL_ERROR "Cannot find a compatible multiplexer for this platform, please file a bug.")
+            endif (HAVE_SELECT)
+        endif(HAVE_KQUEUE)
+    endif(HAVE_POLL)
 endif (HAVE_SYS_EPOLL_H)
-
-if (HAVE_KQUEUE)
-    list(APPEND SOURCE_FILES src/multiplexers/multiplexer_kqueue.c)
-endif (HAVE_KQUEUE)
 
 # Because strndupa is apparnetly not a function or some shit, we must
 # make sure this program compiles.

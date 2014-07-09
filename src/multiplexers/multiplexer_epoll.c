@@ -137,13 +137,7 @@ void ProcessSockets(void)
 	{
 		if (errno != EINTR)
 		{
-			if (errno == EFAULT)
-			{
-				fprintf(stderr, "EFAULT\n");
-				exit(1);
-			}
-			else
-				fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
+			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
 		}
 		return;
 	}

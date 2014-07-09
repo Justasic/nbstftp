@@ -182,7 +182,7 @@ void ProcessSockets(void)
 	{
 		if (errno != EINTR)
 		{
-				fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
+			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
 		}
 		return;
 	}

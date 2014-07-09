@@ -112,6 +112,7 @@ int main(int argc, char **argv)
 	
 	if (nofork == -1)
 		nofork = !config->daemonize;
+	
 	// Go away.
 	Daemonize();
 	

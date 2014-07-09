@@ -23,6 +23,8 @@
 #cmakedefine HAVE_STRNDUPA 1
 #cmakedefine HAVE_STRNLEN 1
 #cmakedefine HAVE_KQUEUE 1
+#cmakedefine HAVE_POLL 1
+#cmakedefine HAVE_SELECT 1
 
 #define VERSION_MAJOR        @PROJECT_MAJOR_VERSION@
 #define VERSION_MINOR        @PROJECT_MINOR_VERSION@
