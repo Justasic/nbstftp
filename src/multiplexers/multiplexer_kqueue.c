@@ -63,7 +63,6 @@ static inline kevent_t *GetChangeEvent(void)
 		{
 			changed_len *= 2;
 			changed = newptr;
-			return NULL;
 		}
 	}
 	
@@ -139,6 +138,10 @@ int InitializeMultiplexer(void)
 		fprintf(stderr, "Failed to realloc an array for kevent: %s\n", strerror(errno));
 		return -1;
 	}
+	
+	// Initialize everything
+	memset(changed, 0, sizeof(kevent_t) * changed_len);
+	memset(events, 0, sizeof(kevent_t) * events_len);
 
 	// Set kqueue idle timeout from config
 	kqtime.tv_sec = config->readtimeout;
@@ -155,7 +158,6 @@ int ShutdownMultiplexer(void)
 	return 0;
 }
 
-extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
 	if (socketpool.length > events_len)

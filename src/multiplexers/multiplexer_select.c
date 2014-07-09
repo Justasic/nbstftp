@@ -44,6 +44,7 @@ static int maxfd = 0;
 
 int AddToMultiplexer(socket_t *s)
 {
+	assert(s);
 	FD_SET(s->fd, &readfds);
 	maxfd = s->fd;
 	return 0;
@@ -51,6 +52,7 @@ int AddToMultiplexer(socket_t *s)
 
 int RemoveFromMultiplexer(socket_t *s)
 {
+	assert(s);
 	FD_CLR(s->fd, &readfds);
 	FD_CLR(s->fd, &writefds);
 	maxfd--;
@@ -62,32 +64,16 @@ int SetSocketStatus(socket_t *s, int status)
 	assert(s);
 	
 	if (status & SF_READABLE && !(s->flags & SF_READABLE))
-	{
 		FD_SET(s->fd, &readfds);
-// 		event = GetChangeEvent();
-// 		EV_SET(event, s->fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-	}
 	
 	if (!(status & SF_READABLE) && s->flags & SF_READABLE)
-	{
 		FD_CLR(s->fd, &writefds);
-// 		event = GetChangeEvent();
-// 		EV_SET(event, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-	}
 	
 	if (status & SF_WRITABLE && !(s->flags & SF_WRITABLE))
-	{
 		FD_SET(s->fd, &writefds);
-// 		event = GetChangeEvent();
-// 		EV_SET(event, s->fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-	}
 	
 	if (!(status & SF_WRITABLE) && s->flags & SF_WRITABLE)
-	{
 		FD_CLR(s->fd, &writefds);
-// 		event = GetChangeEvent();
-// 		EV_SET(event, s->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-	}
 	
 	s->flags = status;
 	
@@ -108,7 +94,6 @@ int ShutdownMultiplexer(void)
 	return 0;
 }
 
-extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
 	fd_set read = readfds, write = writefds, error = readfds;
@@ -123,7 +108,7 @@ void ProcessSockets(void)
 		fprintf(stderr, "Failed to select(): %s\n", strerror(errno));
 	else if (ret)
 	{
-		int processed = 0, idx = 0;
+		int idx = 0;
 		socket_t *s;
 		vec_foreach(&socketpool, s, idx)
 		{

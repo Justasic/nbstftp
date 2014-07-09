@@ -14,152 +14,134 @@
  */
 #include "sysconf.h"
 
-#ifndef HAVE_SYS_EPOLL_H
-# error You probably shouldn't be trying to compile an epoll multiplexer on a epoll-unsupported platform. Try again.
+#ifndef HAVE_POLL
+# error You probably shouldn't be trying to compile an poll multiplexer on a poll-unsupported platform. Try again.
 #endif
 
+#include <sys/poll.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
+#include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+
 #include "socket.h"
+#include "multiplexer.h"
 #include "misc.h"
+#include "vec.h"
 #include "config.h"
 #include "client.h"
 #include "process.h"
 
-#include <sys/epoll.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#ifndef _WIN32
+# include <unistd.h>
+#endif
 
-typedef struct epoll_event epoll_t;
-// Static because it never leaves this file.
-static int EpollHandle = -1;
-static epoll_t *events;
-static size_t events_len = 5;
+typedef struct pollfd poll_t;
+static vec_t(poll_t) events;
 
 int AddToMultiplexer(socket_t *s)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
+	poll_t ev;
+	memset(&ev, 0, sizeof(poll_t));
 	
-	ev.events = EPOLLIN;
-	ev.data.fd = s->fd;
+	ev.fd = s->fd;
+	ev.events = POLLIN;
+	
 	s->flags = SF_READABLE;
 	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_ADD, s->fd, &ev) == -1)
-	{
-		fprintf(stderr, "Unable to add fd %d from epoll: %s\n", s->fd, strerror(errno));
-		return -1;
-	}
-	
+	vec_push(&events, ev);
 	return 0;
 }
 
 int RemoveFromMultiplexer(socket_t *s)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
-	ev.data.fd = s->fd;
-	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_DEL, ev.data.fd, &ev) == -1)
+	// Find our socket
+	for (int idx = 0; idx < events.length; idx++)
 	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s->fd, strerror(errno));
-		return -1;
+		if (events.data[idx].fd == s->fd)
+		{
+			vec_splice(&events, idx, 1);
+			return 0;
+		}
 	}
-	
-	return 0;
+
+	return -1;
 }
 
 int SetSocketStatus(socket_t *s, int status)
 {
-	epoll_t ev;
-	memset(&ev, 0, sizeof(epoll_t));
-	
-	ev.events = (status & SF_READABLE ? EPOLLIN : 0) | (status & SF_WRITABLE ? EPOLLOUT : 0);
-	ev.data.fd = s->fd;
-	s->flags = status;
-	
-	if (epoll_ctl(EpollHandle, EPOLL_CTL_MOD, ev.data.fd, &ev) == -1)
+	// Find our socket, then set the flags needed.
+	for (int idx = 0; idx < events.length; idx++)
 	{
-		fprintf(stderr, "Unable to set fd %d from epoll: %s\n", s->fd, strerror(errno));
-		return -1;
+		if (events.data[idx].fd == s->fd)
+		{
+			poll_t *ev = &events.data[idx];
+			ev->events = (status & SF_READABLE ? POLLIN : 0) | (status & SF_WRITABLE ? POLLOUT : 0);
+			s->flags = status;
+			return 0;
+		}
 	}
-	return 0;
+	
+	return -1;
 }
 
 int InitializeMultiplexer(void)
 {
-	EpollHandle = epoll_create(4);
+	vec_init(&events);
 	
-	events = reallocarray(NULL, events_len, sizeof(epoll_t));
-	if (!events)
-	{
-		fprintf(stderr, "Failed to realloc an array for epoll: %s\n", strerror(errno));
+	if (errno == ENOMEM)
 		return -1;
-	}
+	
 	return 0;
 }
 
 int ShutdownMultiplexer(void)
 {
-	// Close the EPoll handle.
-	close(EpollHandle);
-	
-	// Free our events
-	free(events);
+	vec_deinit(&events);
 	return 0;
 }
 
 void ProcessSockets(void)
 {
-	if (socketpool.length > events_len)
-	{
-		epoll_t *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
-		if (!newptr)
-		{
-			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
-				strerror(errno));
-		}
-		else
-		{
-			events_len *= 2;
-			events = newptr;
-		}
-	}
-	printf("Entering epoll_wait\n");
+	printf("Entering poll\n");
 	
-	int total = epoll_wait(EpollHandle, events, events_len, config->readtimeout * 1000);
+	int total = poll(&vec_first(&events), events.length, config->readtimeout * 1000);
 	
-	if (total == -1)
+	if (total < 0)
 	{
 		if (errno != EINTR)
-		{
 			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
-		}
 		return;
 	}
 	
-	for (int i = 0; i < total; ++i)
+	for (int i = 0, processed = 0; i < events.length && processed != total; ++i)
 	{
-		epoll_t *ev = &events[i];
+		poll_t *ev = &events.data[i];
 		
-		socket_t *s = FindSocket(ev->data.fd);
-		if (!s)
+		if (ev->revents != 0)
+			processed++;
+		else // Nothing to do, move on.
 			continue;
 		
-		if (ev->events & (EPOLLHUP | EPOLLERR))
+		socket_t *s = FindSocket(ev->fd);
+		if (!s)
+		{
+			fprintf(stderr, "Unknown socket %d in poll() multiplexer.\n", ev->fd);
+			continue;
+		}
+		
+		if (ev->revents & (POLLERR | POLLRDHUP))
 		{
 			printf("Epoll error reading socket %d, destroying.\n", s->fd);
 			DestroySocket(s, 1);
 			continue;
 		}
 		
-		// process socket read events.
-		if (ev->events & EPOLLIN)
+		if (ev->revents & POLLIN)
 		{
-// 			printf("Received read on socket %d port %d\n", s->fd, GetPort(s));
 			socketstructs_t ss;
 			socklen_t addrlen = sizeof(ss);
 			uint8_t buf[MAX_PACKET_SIZE];
@@ -173,7 +155,6 @@ void ProcessSockets(void)
 			else if (recvlen == -1)
 			{
 				fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
-// 				running = 0;
 				DestroySocket(s, 1);
 				continue;
 			}
@@ -193,8 +174,7 @@ void ProcessSockets(void)
 			ProcessPacket(c, buf, recvlen);
 		}
 		
-		// Process socket write events
-		if (ev->events & EPOLLOUT && SendPackets() == -1)
+		if (ev->revents & POLLOUT && SendPackets() == -1)
 		{
 			printf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);

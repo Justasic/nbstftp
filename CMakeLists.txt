@@ -119,7 +119,7 @@ check_include_file(sys/types.h HAVE_SYS_TYPES_H)
 check_include_file(stdint.h HAVE_STDINT_H)
 check_include_file(stddef.h HAVE_STDDEF_H)
 
-Find our multiplexer, choose the best one possible.
+# Find our multiplexer, choose the best one possible.
 if (HAVE_SYS_EPOLL_H)
     list(APPEND SOURCE_FILES src/multiplexers/multiplexer_epoll.c)
 else (HAVE_SYS_EPOLL_H)

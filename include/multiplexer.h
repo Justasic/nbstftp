@@ -14,6 +14,7 @@
  */
 #pragma once
 typedef struct socket_s socket_t;
+#include "vec.h"
 
 // Multiplexer socket statuses
 enum
@@ -29,3 +30,5 @@ extern int SetSocketStatus(socket_t *s, int status);
 extern int InitializeMultiplexer(void);
 extern int ShutdownMultiplexer(void);
 extern void ProcessSockets(void);
+
+#include "socket.h"
