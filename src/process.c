@@ -41,14 +41,28 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	{
 		case PACKET_DATA:
 			printf("Got a data packet\n");
-			if ((len + sizeof(packet_t) > MAX_PACKET_SIZE))
+			if ((len > MAX_PACKET_SIZE))
 			{
-				fprintf(stderr, "Received an oversided data packet! Terminating transfer.\n");
-				Error(c, ERROR_ILLEGAL, "Sent an oversided packet.");
+				fprintf(stderr, "Received an oversized data packet! Terminating transfer.\n");
+				Error(c, ERROR_ILLEGAL, "Sent an oversized packet.");
 			}
 
-			if ((len - sizeof(packet_t)) < 512)
-				printf("Got end of data packet?\n");
+            // If we're sending a file then write the next block
+            // otherwise, just ignore it because it's not ours.
+            if (c->sendingfile)
+            {
+                size_t flen = fwrite(p+sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
+                printf("Wrote block %d of length %zu\n", ntohs(p->blockno), flen);
+
+                Acknowledge(c, ntohs(p->blockno));
+
+                if ((len - sizeof(packet_t)) < 512)
+                {
+                    printf("Got end of data packet\n");
+                    // Notify on the sending of a packet that this needs to be removed.
+                    c->destroy = 1;
+                }
+            }
 			break;
 		case PACKET_ERROR:
 		{
@@ -122,8 +136,41 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 #endif
 
 			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
-			Error(c, ERROR_UNDEFINED, "Operation not yet supported.");
 
+			// We don't support mail-mode
+			if (!strcasecmp(mode, "mail"))
+			{
+				Error(c, ERROR_ILLEGAL, "Mail mode not supported by NBSTFTP");
+				break;
+			}
+
+			int imode = strcasecmp(mode, "netascii");
+
+			char tmp[(1 << 16)];
+			sprintf(tmp, "%s/%s", config->directory, filename);
+
+            printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
+
+            FILE *f = fopen(mode, imode == 0 ? "wt" : "wb");
+            if (!f)
+            {
+                if (errno == EACCES)
+                    Error(c, ERROR_NOUSER, "Cannot access file: %s", strerror(errno));
+                else
+                    Error(c, ERROR_NOFILE, "Cannot read file: %s", strerror(errno));
+                goto end;
+            }
+
+            printf("File %s is available for write, writing first packet...\n", tmp);
+
+            c->f = f;
+			c->currentblockno = 1;
+			c->sendingfile = 1;
+
+            // Acknowledge our transfer request
+            Acknowledge(c, 0);
+
+end:
 #ifndef HAVE_STRNDUPA
 			free(filename);
 			free(mode);

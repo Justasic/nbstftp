@@ -64,8 +64,8 @@ static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
 }
 
-// Send packets out the socket, this will be called by the epoll
-// system in socket.c.
+// Send packets out the socket, this will be called by the multiplexers
+// system in one of the multiplexers files
 int SendPackets(void)
 {
 	client_t *c = NULL;

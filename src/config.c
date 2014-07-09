@@ -96,7 +96,9 @@ void DeallocateConfig(config_t *conf)
 	int i = 0;
 	vec_foreach(&config->listenblocks, block, i)
 	{
-		free(block->bindaddr);
+        if (block->bindaddr)
+    		free(block->bindaddr);
+
 		free(block);
 	}
 	

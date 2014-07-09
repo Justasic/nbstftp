@@ -194,7 +194,7 @@ int InitializeSockets(void)
 			block->port = 69;
 		
 		if (!block->bindaddr)
-			block->bindaddr = "0.0.0.0";
+			block->bindaddr = strdup("0.0.0.0");
 		
 		if (BindToSocket(block->bindaddr, block->port) == -1)
 		{
