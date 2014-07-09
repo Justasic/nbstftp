@@ -23,6 +23,7 @@
 #include "config.h"
 #include "client.h"
 #include "process.h"
+#include "vec.h"
 
 #include <sys/epoll.h>
 #include <sys/types.h>
@@ -36,8 +37,7 @@
 typedef struct epoll_event epoll_t;
 // Static because it never leaves this file.
 static int EpollHandle = -1;
-static epoll_t *events;
-static size_t events_len = 5;
+static vec_t(epoll_t) events;
 
 int AddToMultiplexer(socket_t *s)
 {
@@ -93,12 +93,17 @@ int InitializeMultiplexer(void)
 {
 	EpollHandle = epoll_create(4);
 	
-	events = reallocarray(NULL, events_len, sizeof(epoll_t));
-	if (!events)
-	{
-		fprintf(stderr, "Failed to realloc an array for epoll: %s\n", strerror(errno));
+	if (EpollHandle == -1)
 		return -1;
-	}
+	
+	vec_init(&events);
+	
+	// Default of 5 events, it will expand if we get more sockets
+	vec_reserve(&events, 5);
+	
+	if (errno == ENOMEM)
+		return -1;
+	
 	return 0;
 }
 
@@ -108,42 +113,34 @@ int ShutdownMultiplexer(void)
 	close(EpollHandle);
 	
 	// Free our events
-	free(events);
+	vec_deinit(&events);
+	
 	return 0;
 }
 
+extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
-	if (socketpool.length > events_len)
+	if (socketpool.length >= events.capacity)
 	{
-		epoll_t *newptr = reallocarray(events, events_len * 2, sizeof(epoll_t));
-		if (!newptr)
-		{
-			fprintf(stderr, "Failed to allocate more memory to watch events on more sockets! (%s)\n",
-				strerror(errno));
-		}
-		else
-		{
-			events_len *= 2;
-			events = newptr;
-		}
+		printf("Reserving more space for events\n");
+		vec_reserve(&events, socketpool.length * 2);
 	}
+	
 	printf("Entering epoll_wait\n");
 	
-	int total = epoll_wait(EpollHandle, events, events_len, config->readtimeout * 1000);
+	int total = epoll_wait(EpollHandle, &vec_first(&events), events.capacity, config->readtimeout * 1000);
 	
 	if (total == -1)
 	{
 		if (errno != EINTR)
-		{
 			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
-		}
 		return;
 	}
 	
 	for (int i = 0; i < total; ++i)
 	{
-		epoll_t *ev = &events[i];
+		epoll_t *ev = &(events.data[i]);
 		
 		socket_t *s = FindSocket(ev->data.fd);
 		if (!s)
