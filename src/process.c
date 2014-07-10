@@ -69,9 +69,9 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
 			// to a const char * and send to printf.
 #ifdef HAVE_STRNDUPA
-			const char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
+			char *error = strndupa(((const char*)p) + sizeof(packet_t), 512);
 #else
-			const char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
+			char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
 #endif
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 
@@ -128,11 +128,11 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		case PACKET_WRQ:
 		{
 #ifdef HAVE_STRNDUPA
-			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
+			char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #else
-			const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
-			const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+			char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #endif
 
 			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
@@ -186,14 +186,14 @@ end:
 			// get the size of that first value (eg, the uint16_t)
 			// Use strndupa to use the stack frame for temporary allocation with a
 			// max length of 512 bytes. This will prevent buffer-overflow exploits (or so I hope)
-			const char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
+			char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
 			// This one is a bit weirder. We get the size of the uint16 like
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
-			const char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #else
-			const char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
-			const char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
+			char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #endif
 			
 			// mode can be "netascii", "octet", or "mail" case insensitive.

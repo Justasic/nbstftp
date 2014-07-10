@@ -56,7 +56,7 @@ static inline kevent_t *GetChangeEvent(void)
 int AddToMultiplexer(socket_t *s)
 {
 	// Set the socket as readable and add it to kqueue
-	return SetSocketStatus(&s, SF_READABLE);
+	return SetSocketStatus(s, SF_READABLE);
 }
 
 int RemoveFromMultiplexer(socket_t s)
