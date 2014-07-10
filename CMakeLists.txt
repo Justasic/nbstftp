@@ -199,27 +199,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C PREFIX "" SUF
 
 add_dependencies(${PROJECT_NAME} license_headers)
 
-# Find and Generate our man page
-if (GZIP)
-	set(MAN_FILE "${CMAKE_BINARY_DIR}/nbstftp.8.gz")
-	
-	add_custom_command(
-		OUTPUT ${MAN_FILE}
-		COMMAND "${GZIP} < ${CMAKE_SOURCE_DIR}/nbstftp.8 > ${MAN_FILE}"
-		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-		COMMENT "Compressing man page")
-	
-	add_custom_target(
-		manpage_generation
-		ALL DEPENDS
-		${MAN_FILE})
-	
-	add_dependencies(${PROJECT_NAME} manpage_generation)
-else(GZIP)
-	set(MAN_FILE "${CMAKE_SOURCE_DIR}/nbstftp.8")
-endif (GZIP)
-
 # Do the make install
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
 install(FILES ${CMAKE_SOURCE_DIR}/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
-install(FILES ${MAN_FILE} DESTINATION man)
+# install(FILES ${MAN_FILE} DESTINATION man)
