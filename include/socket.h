@@ -17,7 +17,6 @@
 #include <stdint.h>
 #include "packets.h"
 #include "vec.h"
-#include "multiplexer.h"
 // Forward declare to prevent circular includes.
 typedef struct client_s client_t;
 
@@ -36,10 +35,15 @@ typedef struct socket_s
 	char *bindaddr;
 } socket_t;
 
-typedef vec_t(socket_t*) socket_vec_t;
+typedef vec_t(socket_t) socket_vec_t;
+extern socket_vec_t socketpool;
 
-extern short GetPort(socket_t *s);
-extern void DestroySocket(socket_t *s, uint8_t close);
+extern short GetPort(socket_t s);
+extern void DestroySocket(socket_t s, uint8_t close);
 
-extern socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding);
-extern socket_t *FindSocket(int fd);
+extern int AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding, socket_t *s);
+extern int FindSocket(int fd, socket_t *s);
+
+extern void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated);
+extern int SendPackets(socket_t s);
+extern int ReceivePackets(socket_t s);

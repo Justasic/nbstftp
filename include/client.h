@@ -18,9 +18,7 @@
 #include <stdio.h>
 #include "packets.h"
 #include "vec.h"
-
-// #include "socket.h"
-typedef struct socket_s socket_t;
+#include "socket.h"
 
 typedef struct packetqueue_s
 {
@@ -31,15 +29,14 @@ typedef struct packetqueue_s
 
 typedef struct client_s
 {
-	socket_t *s;
+	socket_t s;
         // Status variables
 	uint16_t currentblockno;
         uint8_t waiting, sendingfile, destroy;
 	
 	// Buffered packets. May use it later when a packet has not
 	// been received yet and we need to resend.
-	packetqueue_t **packetqueue;
-	size_t queuelen, alloclen;
+	vec_t(packetqueue_t) packetqueue_vec;
 
         // Current file we're sending
         FILE *f;
@@ -56,8 +53,8 @@ extern void RemoveClient(client_t *c);
 // Compare two clients and check if they're equal
 extern int CompareClients(client_t *c1, client_t *c2);
 // Find a client based on their socket structure.
-extern client_t *FindClient(socket_t *s);
+extern client_t *FindClient(socket_t s, uint8_t compareport);
 // Either find a client or allocate a new one, also adds it to the linked list.
-extern client_t *FindOrAllocateClient(socket_t *s);
+extern client_t *FindOrAllocateClient(socket_t s);
 extern void DeallocateClients(void);
 

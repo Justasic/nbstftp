@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "socket.h"
 #include "multiplexer.h"
 #include "misc.h"
 #include "vec.h"
@@ -56,12 +55,12 @@ int AddToMultiplexer(socket_t *s)
 	return 0;
 }
 
-int RemoveFromMultiplexer(socket_t *s)
+int RemoveFromMultiplexer(socket_t s)
 {
 	// Find our socket
 	for (int idx = 0; idx < events.length; idx++)
 	{
-		if (events.data[idx].fd == s->fd)
+		if (events.data[idx].fd == s.fd)
 		{
 			vec_splice(&events, idx, 1);
 			return 0;
@@ -126,8 +125,8 @@ void ProcessSockets(void)
 		else // Nothing to do, move on.
 			continue;
 		
-		socket_t *s = FindSocket(ev->fd);
-		if (!s)
+		socket_t s;
+		if (FindSocket(ev->fd, &s) == -1)
 		{
 			fprintf(stderr, "Unknown socket %d in poll() multiplexer.\n", ev->fd);
 			continue;
@@ -135,46 +134,18 @@ void ProcessSockets(void)
 		
 		if (ev->revents & (POLLERR | POLLRDHUP))
 		{
-			printf("Epoll error reading socket %d, destroying.\n", s->fd);
+			printf("Epoll error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
 		
-		if (ev->revents & POLLIN)
+		if (ev->revents & POLLIN && ReceivePackets(s) == -1)
 		{
-			socketstructs_t ss;
-			socklen_t addrlen = sizeof(ss);
-			uint8_t buf[MAX_PACKET_SIZE];
-			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
-			
-			// The kernel either told us that we need to read again
-			// or we received a signal and are continuing from where
-			// we left off.
-			if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
-				continue;
-			else if (recvlen == -1)
-			{
-				fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
-				DestroySocket(s, 1);
-				continue;
-			}
-			
-			// Create our temp client socket
-			socket_t cs;
-			cs.fd = s->fd;
-			cs.type = s->type;
-			cs.addr = ss;
-			
-			// Either find the client or allocate a new client and socket
-			client_t *c = FindOrAllocateClient(&cs);
-			
-			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s->fd);
-			
-			// Process the packet received.
-			ProcessPacket(c, buf, recvlen);
+			printf("Destorying socket due to receive failure!\n");
+			DestroySocket(s, 1);
 		}
 		
-		if (ev->revents & POLLOUT && SendPackets() == -1)
+		if (ev->revents & POLLOUT && SendPackets(s) == -1)
 		{
 			printf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);

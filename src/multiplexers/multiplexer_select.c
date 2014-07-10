@@ -34,7 +34,6 @@
 
 // #include "client.h"
 #include "multiplexer.h"
-#include "socket.h"
 #include "config.h"
 #include "vec.h"
 #include "process.h"
@@ -44,17 +43,16 @@ static int maxfd = 0;
 
 int AddToMultiplexer(socket_t *s)
 {
-	assert(s);
 	FD_SET(s->fd, &readfds);
 	maxfd = s->fd;
+	s->flags = SF_READABLE;
 	return 0;
 }
 
-int RemoveFromMultiplexer(socket_t *s)
+int RemoveFromMultiplexer(socket_t s)
 {
-	assert(s);
-	FD_CLR(s->fd, &readfds);
-	FD_CLR(s->fd, &writefds);
+	FD_CLR(s.fd, &readfds);
+	FD_CLR(s.fd, &writefds);
 	maxfd--;
 	return 0;
 }
@@ -109,56 +107,27 @@ void ProcessSockets(void)
 	else if (ret)
 	{
 		int idx = 0;
-		socket_t *s;
+		socket_t s;
 		vec_foreach(&socketpool, s, idx)
 		{
-			int has_read = FD_ISSET(s->fd, &read);
-			int has_write = FD_ISSET(s->fd, &write);
-			int has_error = FD_ISSET(s->fd, &error);
+			int has_read = FD_ISSET(s.fd, &read);
+			int has_write = FD_ISSET(s.fd, &write);
+			int has_error = FD_ISSET(s.fd, &error);
 			
 			if (has_error)
 			{
-				printf("select() error reading socket %d, destroying.\n", s->fd);
+				printf("select() error reading socket %d, destroying.\n", s.fd);
 				DestroySocket(s, 1);
 				continue;
 			}
 			
-			if (has_read)
+			if (has_read && ReceivePackets(s) == -1)
 			{
-				socketstructs_t ss;
-				socklen_t addrlen = sizeof(ss);
-				uint8_t buf[MAX_PACKET_SIZE];
-				size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
-				
-				// The kernel either told us that we need to read again
-				// or we received a signal and are continuing from where
-				// we left off.
-				if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
-					continue;
-				else if (recvlen == -1)
-				{
-					fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
-// 					running = 0;
-					DestroySocket(s, 1);
-					continue;
-				}
-				
-				// Create our temp client socket
-				socket_t cs;
-				cs.fd = s->fd;
-				cs.type = s->type;
-				cs.addr = ss;
-				
-				// Either find the client or allocate a new client and socket
-				client_t *c = FindOrAllocateClient(&cs);
-				
-				printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s->fd);
-				
-				// Process the packet received.
-				ProcessPacket(c, buf, recvlen);
+				printf("Destorying socket due to receive failure!\n");
+				DestroySocket(s, 1);
 			}
 			
-			if (has_write && SendPackets() == -1)
+			if (has_write && SendPackets(s) == -1)
 			{
 				printf("Destorying socket due to send failure!\n");
 				DestroySocket(s, 1);

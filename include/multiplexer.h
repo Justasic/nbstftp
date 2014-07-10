@@ -13,8 +13,8 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #pragma once
-typedef struct socket_s socket_t;
 #include "vec.h"
+#include "socket.h"
 
 // Multiplexer socket statuses
 enum
@@ -24,11 +24,10 @@ enum
 };
 
 extern int AddToMultiplexer(socket_t *s);
-extern int RemoveFromMultiplexer(socket_t *s);
+extern int RemoveFromMultiplexer(socket_t s);
 extern int SetSocketStatus(socket_t *s, int status);
 
 extern int InitializeMultiplexer(void);
 extern int ShutdownMultiplexer(void);
 extern void ProcessSockets(void);
 
-#include "socket.h"

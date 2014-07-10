@@ -28,6 +28,8 @@ void AddClient(client_t *c)
 	assert(c);
 	
 	vec_push(&clientpool, c);
+	
+	vec_init(&c->packetqueue_vec);
 	// Make sure we could add the socket.
 	if (errno == ENOMEM)
 	{
@@ -36,19 +38,27 @@ void AddClient(client_t *c)
 	}
 }
 
-client_t *FindOrAllocateClient(socket_t *cs)
+client_t *FindOrAllocateClient(socket_t cs)
 {
-	assert(cs);
-	
-	client_t *found = FindClient(cs);
+	client_t *found = FindClient(cs, 1);
 
 	if (!found)
 	{
-		printf("*** Allocating client!\n");
 		found = nmalloc(sizeof(client_t));
-//                 memcpy(&found->s->addr, &s->addr, sizeof(socketstructs_t));
 		// Make a permanent socket which gets added to the socket vector.
-		found->s = AddSocket(cs->fd, NULL, cs->type, cs->addr, 0);
+		if (AddSocket(cs.fd, NULL, cs.type, cs.addr, 0, &found->s) == -1)
+		{
+			free(found);
+			return NULL;
+		}
+		
+		vec_init(&found->packetqueue_vec);
+		if (errno == ENOMEM)
+		{
+			fprintf(stderr, "Failed to allocate packet queue!\n");
+			return NULL;
+		}
+		
 		AddClient(found);
 	}
 
@@ -60,10 +70,13 @@ void RemoveClient(client_t *c)
 	assert(c);
 
 	// Remove the socket from the socket pool
-// 	DestroySocket(c->s, 0);
+	DestroySocket(c->s, 0);
 	
 	// Remove the client from the client pool
 	vec_remove(&clientpool, c);
+	
+	// Destroy the packet queue
+	vec_deinit(&c->packetqueue_vec);
 
 	// Delete the client
 	free(c);
@@ -74,29 +87,29 @@ int CompareClients(client_t *c1, client_t *c2)
 	assert(c1);
 	assert(c2);
 
-	assert(c1->s->addr.sa.sa_family == AF_INET ||
-		c1->s->addr.sa.sa_family == AF_INET6);
-	assert(c2->s->addr.sa.sa_family == AF_INET ||
-		c2->s->addr.sa.sa_family == AF_INET6);
+	assert(c1->s.addr.sa.sa_family == AF_INET ||
+		c1->s.addr.sa.sa_family == AF_INET6);
+	assert(c2->s.addr.sa.sa_family == AF_INET ||
+		c2->s.addr.sa.sa_family == AF_INET6);
 	
-	socket_t *s1 = c1->s, *s2 = c2->s;
+	socket_t s1 = c1->s, s2 = c2->s;
 
         // First, compare address types, if they're not a match then
         // obviously the clients are very different.
-	if (s1->addr.sa.sa_family != s2->addr.sa.sa_family)
+	if (s1.addr.sa.sa_family != s2.addr.sa.sa_family)
                 return 0;
 
         // Now compare the addresses. IPv4 first
-	if (s1->addr.sa.sa_family == AF_INET)
+	if (s1.addr.sa.sa_family == AF_INET)
         {
-		return memcmp(&s1->addr.in.sin_addr,
-			      &s2->addr.in.sin_addr,
+		return memcmp(&(s1.addr.in.sin_addr),
+			      &(s2.addr.in.sin_addr),
                               sizeof(struct in_addr)) == 0;
         }
         else
         {
-		return memcmp(&s1->addr.in6.sin6_addr,
-			      &s2->addr.in6.sin6_addr,
+		return memcmp(&(s1.addr.in6.sin6_addr),
+			      &(s2.addr.in6.sin6_addr),
 			      sizeof(struct in6_addr)) == 0;
         }
 
@@ -105,24 +118,21 @@ int CompareClients(client_t *c1, client_t *c2)
         return 0;
 }
 
-client_t *FindClient(socket_t *s)
+client_t *FindClient(socket_t s, uint8_t compareport)
 {
-	assert(s);
-	
-// 	printf("Finding client for socket %d\n", s->fd);
-	
 	for (int idx = 0; idx < (&clientpool)->length; idx++)
-		if ((&clientpool)->data[idx]->s->fd == s->fd)
+		if ((&clientpool)->data[idx]->s.fd == s.fd)
 		{
 			client_t *c = (&clientpool)->data[idx];
-			if (GetPort(c->s) == GetPort(s))
+			if (compareport)
 			{
-// 				printf(" Found\n");
-				return c;
+				if (GetPort(c->s) == GetPort(s))
+					return c;
 			}
+			else
+				return c;
 		}
         
-//         printf(" Not found\n");
         // Couldn't find the client, fall through to return NULL.
         return NULL;
 }
@@ -135,21 +145,7 @@ void DeallocateClients(void)
 	// Deallocate any remaining packets and the client's queue.
 	vec_foreach(&clientpool, c, i)
 	{
-		if (c->queuelen)
-		{
-			printf("Not sending %zu packets to sock %d due to shutdown\n", c->queuelen, c->s->fd);
-			for (size_t i = 0, end = c->queuelen; i < end; ++i, c->queuelen--)
-			{
-				packetqueue_t *packet = c->packetqueue[i];
-				
-				// Free the packet structure
-				if (packet->allocated)
-					free(packet->p);
-			}
-		}
-		
-		// Deallocate the client
-		free(c->packetqueue);
+		vec_deinit(&c->packetqueue_vec);
 		free(c);
 	}
 	

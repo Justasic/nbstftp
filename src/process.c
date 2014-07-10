@@ -47,22 +47,22 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				Error(c, ERROR_ILLEGAL, "Sent an oversized packet.");
 			}
 
-            // If we're sending a file then write the next block
-            // otherwise, just ignore it because it's not ours.
-            if (c->sendingfile)
-            {
-                size_t flen = fwrite(p+sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
-                printf("Wrote block %d of length %zu\n", ntohs(p->blockno), flen);
+			// If we're sending a file then write the next block
+			// otherwise, just ignore it because it's not ours.
+			if (c->sendingfile)
+			{
+				size_t flen = fwrite(p+sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
+				printf("Wrote block %d of length %zu\n", ntohs(p->blockno), flen);
 
-                Acknowledge(c, ntohs(p->blockno));
+				Acknowledge(c, ntohs(p->blockno));
 
-                if ((len - sizeof(packet_t)) < 512)
-                {
-                    printf("Got end of data packet\n");
-                    // Notify on the sending of a packet that this needs to be removed.
-                    c->destroy = 1;
-                }
-            }
+				if ((len - sizeof(packet_t)) < 512)
+				{
+					printf("Got end of data packet\n");
+					// Notify on the sending of a packet that this needs to be removed.
+					c->destroy = 1;
+				}
+			}
 			break;
 		case PACKET_ERROR:
 		{
@@ -100,7 +100,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		}
 		case PACKET_ACK:
 		{
-			char *addr1 = inet_ntoa(c->s->addr.in.sin_addr);
+			char *addr1 = inet_ntoa(c->s.addr.in.sin_addr);
 			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
 			
 			if (c->sendingfile)
@@ -149,26 +149,26 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			char tmp[(1 << 16)];
 			sprintf(tmp, "%s/%s", config->directory, filename);
 
-            printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
+			printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
 
-            FILE *f = fopen(mode, imode == 0 ? "wt" : "wb");
-            if (!f)
-            {
-                if (errno == EACCES)
-                    Error(c, ERROR_NOUSER, "Cannot access file: %s", strerror(errno));
-                else
-                    Error(c, ERROR_NOFILE, "Cannot read file: %s", strerror(errno));
-                goto end;
-            }
+			FILE *f = fopen(mode, imode == 0 ? "wt" : "wb");
+			if (!f)
+			{
+				if (errno == EACCES)
+					Error(c, ERROR_NOUSER, "Cannot access file: %s", strerror(errno));
+				else
+					Error(c, ERROR_NOFILE, "Cannot read file: %s", strerror(errno));
+				goto end;
+			}
 
-            printf("File %s is available for write, writing first packet...\n", tmp);
+			printf("File %s is available for write, writing first packet...\n", tmp);
 
-            c->f = f;
+			c->f = f;
 			c->currentblockno = 1;
 			c->sendingfile = 1;
 
-            // Acknowledge our transfer request
-            Acknowledge(c, 0);
+			// Acknowledge our transfer request
+			Acknowledge(c, 0);
 
 end:
 #ifndef HAVE_STRNDUPA

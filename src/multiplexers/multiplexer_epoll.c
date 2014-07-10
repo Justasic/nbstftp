@@ -18,7 +18,7 @@
 # error You probably shouldn't be trying to compile an epoll multiplexer on a epoll-unsupported platform. Try again.
 #endif
 
-#include "socket.h"
+#include "multiplexer.h"
 #include "misc.h"
 #include "config.h"
 #include "client.h"
@@ -57,15 +57,15 @@ int AddToMultiplexer(socket_t *s)
 	return 0;
 }
 
-int RemoveFromMultiplexer(socket_t *s)
+int RemoveFromMultiplexer(socket_t s)
 {
 	epoll_t ev;
 	memset(&ev, 0, sizeof(epoll_t));
-	ev.data.fd = s->fd;
+	ev.data.fd = s.fd;
 	
 	if (epoll_ctl(EpollHandle, EPOLL_CTL_DEL, ev.data.fd, &ev) == -1)
 	{
-		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s->fd, strerror(errno));
+		fprintf(stderr, "Unable to remove fd %d from epoll: %s\n", s.fd, strerror(errno));
 		return -1;
 	}
 	
@@ -118,7 +118,6 @@ int ShutdownMultiplexer(void)
 	return 0;
 }
 
-extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
 	if (socketpool.length >= events.capacity)
@@ -142,56 +141,29 @@ void ProcessSockets(void)
 	{
 		epoll_t *ev = &(events.data[i]);
 		
-		socket_t *s = FindSocket(ev->data.fd);
-		if (!s)
+		socket_t s;
+		if (FindSocket(ev->data.fd, &s) == -1)
+		{
+			fprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->data.fd);
 			continue;
+		}
 		
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{
-			printf("Epoll error reading socket %d, destroying.\n", s->fd);
+			printf("Epoll error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
 		
 		// process socket read events.
-		if (ev->events & EPOLLIN)
+		if (ev->events & EPOLLIN && ReceivePackets(s) == -1)
 		{
-// 			printf("Received read on socket %d port %d\n", s->fd, GetPort(s));
-			socketstructs_t ss;
-			socklen_t addrlen = sizeof(ss);
-			uint8_t buf[MAX_PACKET_SIZE];
-			size_t recvlen = recvfrom(s->fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
-			
-			// The kernel either told us that we need to read again
-			// or we received a signal and are continuing from where
-			// we left off.
-			if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
-				continue;
-			else if (recvlen == -1)
-			{
-				fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
-// 				running = 0;
-				DestroySocket(s, 1);
-				continue;
-			}
-			
-			// Create our temp client socket
-			socket_t cs;
-			cs.fd = s->fd;
-			cs.type = s->type;
-			cs.addr = ss;
-			
-			// Either find the client or allocate a new client and socket
-			client_t *c = FindOrAllocateClient(&cs);
-			
-			printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s->fd);
-			
-			// Process the packet received.
-			ProcessPacket(c, buf, recvlen);
+			printf("Destorying socket due to receive failure!\n");
+			DestroySocket(s, 1);
 		}
 		
 		// Process socket write events
-		if (ev->events & EPOLLOUT && SendPackets() == -1)
+		if (ev->events & EPOLLOUT && SendPackets(s) == -1)
 		{
 			printf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);

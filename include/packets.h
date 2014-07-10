@@ -70,15 +70,6 @@ typedef struct packet_s
 	// void *data;
 } packet_t;
 
-// Define our packet structure for the RRQ and WRQ packets
-typedef struct RequestPacket_s
-{
-	uint16_t opcode;
-	char *filename;
-	char *mode;
-} RequestPacket_t;
-
-
 // Handle client information
 typedef union socketstructs_s
 {
@@ -95,4 +86,3 @@ __attribute__((format(printf, 3, 4)))
 extern void Error(client_t *client, const uint16_t errnum, const char *str, ...);
 extern void Acknowledge(client_t *client, uint16_t blockno);
 extern void SendData(client_t *client, void *data, size_t len);
-extern int SendPackets(void);

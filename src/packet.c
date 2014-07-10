@@ -21,89 +21,14 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <dirent.h>
 #include <time.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/socket.h>
-#include <sys/types.h>
+#include <stdarg.h>
 #include <assert.h>
 #include "client.h"
 #include "misc.h"
 #include "socket.h"
-
-// Queue packets for sending -- internal function
-static void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
-{
-	// We're adding another packet.
-	// Try and keep up with the required queue
-	if (++c->queuelen >= c->alloclen)
-	{
-		printf("Expanding queue to %zu items (%zu bytes total)\n", c->queuelen, c->queuelen * sizeof(packetqueue_t));
-		packetqueue_t **newqueue = reallocarray(c->packetqueue, sizeof(packetqueue_t), c->queuelen);
-		if (!newqueue)
-		{
-			// This should cause a resend of the packet or a timeout.
-			fprintf(stderr, "Failed to allocate more slots in packet queue, discarding packet! (%s)\n",
-				strerror(errno));
-			if (allocated)
-				free(p);
-		}
-		c->alloclen = c->queuelen;
-		c->packetqueue = newqueue;
-	}
-	
-	packetqueue_t *pack = nmalloc(sizeof(packetqueue_t));
-	pack->p = p;
-	pack->len = len;
-	pack->allocated = allocated;
-	
-	c->packetqueue[c->queuelen-1] = pack;
-	
-	// We're ready to write.
-	SetSocketStatus(c->s, SF_WRITABLE | SF_READABLE);
-}
-
-// Send packets out the socket, this will be called by the multiplexers
-// system in one of the multiplexers files
-int SendPackets(void)
-{
-	client_t *c = NULL;
-	int i;
-	
-	vec_foreach(&clientpool, c, i)
-	{
-		for (size_t i = 0, end = c->queuelen; i < end; ++i)
-		{
-			packetqueue_t *packet = c->packetqueue[i];
-			printf("Sending packet %d length %zu\n", ntohs(packet->p->opcode), packet->len);
-			
-// 			printf("Responding on socket %d port %d (%d)\n", c->s->fd, GetPort(c->s), c->s->addr.in.sin_port);
-			
-			int sendlen = sendto(c->s->fd, packet->p, packet->len, 0, &c->s->addr.sa, sizeof(c->s->addr.sa));
-			if (sendlen == -1)
-			{
-				perror("sendto failed");
-				return -1;
-			}
-		
-			// Free the packet structure
-			if (packet->allocated)
-				free(packet->p);
-		}
-		c->queuelen = 0;
-		SetSocketStatus(c->s, SF_READABLE);
-		
-		if (c->destroy)
-		{
-			if (c->f)
-				fclose(c->f);
-			RemoveClient(c);
-		}
-	}
-
-	return 0;
-}
 
 void SendData(client_t *c, void *data, size_t len)
 {

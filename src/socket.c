@@ -83,7 +83,7 @@ int BindToSocket(const char *addr, short port)
 		return -1;
 	}
 
-	if (!AddSocket(fd, addr, saddr.sa.sa_family, saddr, 1))
+	if (AddSocket(fd, addr, saddr.sa.sa_family, saddr, 1, NULL) == -1)
 	{
 		fprintf(stderr, "Failed to bind to socket!\n");
 		return -1;
@@ -93,26 +93,25 @@ int BindToSocket(const char *addr, short port)
 	return 0;
 }
 
-socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding)
+int AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding, socket_t *s)
 {
 	if (!addr)
 		addr = inet_ntoa(saddr.in.sin_addr);
 	
-	socket_t *sock = nmalloc(sizeof(socket_t));
-	sock->bindaddr = strdup(addr);
-	sock->type = saddr.sa.sa_family;
-	sock->fd = fd;
-	sock->flags = 0;
-	memcpy(&sock->addr, &saddr, sizeof(socketstructs_t));
+	socket_t sock;
+	sock.bindaddr = strdup(addr);
+	sock.type = saddr.sa.sa_family;
+	sock.fd = fd;
+	sock.flags = 0;
+	memcpy(&(sock.addr), &saddr, sizeof(socketstructs_t));
 
 	// Add it to the multiplexer
 	if (binding)
 	{
-		if (AddToMultiplexer(sock) == -1)
+		if (AddToMultiplexer(&sock) == -1)
 		{
 			close(fd);
-			free(sock);
-			return NULL;
+			return -1;
 		}
 	}
 	
@@ -122,51 +121,64 @@ socket_t *AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, u
 	{
 		fprintf(stderr, "Failed to add socket to socket pool!\n");
 		DestroySocket(sock, 0);
-		return NULL;
+		return -1;
 	}
 	
-	return sock;
+	if (s)
+		*s = sock;
+	
+	return 0;
 }
 
-socket_t *FindSocket(int fd)
+int FindSocket(int fd, socket_t *s)
 {
-	socket_t *s = NULL;
+	socket_t sock;
 	int i;
 
-	vec_foreach(&socketpool, s, i)
+	vec_foreach(&socketpool, sock, i)
 	{
-		if (s->fd == fd)
-			return s;
+		if (sock.fd == fd)
+		{
+			*s = sock;
+			return 0;
+		}
 	}
 
-	return NULL;
+	return -1;
 }
 
-short GetPort(socket_t *s)
+short GetPort(socket_t s)
 {
 	// if IPv4, get IPv4 port
-	if (s->addr.sa.sa_family == AF_INET)
-		return ntohs(s->addr.in.sin_port);
+	if (s.addr.sa.sa_family == AF_INET)
+		return ntohs(s.addr.in.sin_port);
 	// Otherwise, get IPv6 port
-	else if(s->addr.sa.sa_family == AF_INET6)
-		return htons(s->addr.in6.sin6_port);
+	else if(s.addr.sa.sa_family == AF_INET6)
+		return htons(s.addr.in6.sin6_port);
 	
 	return -1;
 }
 
-void DestroySocket(socket_t *s, uint8_t closefd)
+void DestroySocket(socket_t s, uint8_t closefd)
 {
 	// First, remove it from the EPoll system.
 	RemoveFromMultiplexer(s);
 
 	// Now remove it from our vector
-	vec_remove(&socketpool, s);
+	for (int idx = 0; idx < socketpool.length; idx++)
+	{
+		if (socketpool.data[idx].fd == s.fd && !strcmp(socketpool.data[idx].bindaddr, s.bindaddr))
+		{
+			vec_splice(&socketpool, idx, 1);
+			break;
+		}
+	}
+	
 	// Close the socket
 	if (closefd)
-		close(s->fd);
+		close(s.fd);
 	// Free a string then free itself.
-	free(s->bindaddr);
-	free(s);
+	free(s.bindaddr);
 }
 
 // Initialize the Epoll socket descriptor as well as all the
@@ -216,19 +228,118 @@ int InitializeSockets(void)
 
 void ShutdownSockets(void)
 {
-	socket_t *s;
+	socket_t s;
 	int i;
 
 	// Close all the sockets
 	vec_foreach(&socketpool, s, i)
 	{
-		close(s->fd);
-		free(s->bindaddr);
-		free(s);
+		close(s.fd);
+		free(s.bindaddr);
 	}
 
 	vec_deinit(&socketpool);
 	
 	// Shutdown our multiplexer
 	ShutdownMultiplexer();
+}
+
+// Queue packets for sending -- internal function
+void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
+{
+	// We're adding another packet.
+	// Try and keep up with the required queue
+	if (c->packetqueue_vec.length+1 >= c->packetqueue_vec.capacity)
+		vec_reserve(&c->packetqueue_vec, c->packetqueue_vec.length * 2);
+	
+	packetqueue_t pack;
+	pack.p = p;
+	pack.len = len;
+	pack.allocated = allocated;
+	
+	vec_push(&c->packetqueue_vec, pack);
+	
+	// We're ready to write.
+	SetSocketStatus(&c->s, SF_WRITABLE | SF_READABLE);
+}
+
+// Send packets out the socket, this will be called by the multiplexers
+// system in one of the multiplexers files
+int SendPackets(socket_t s)
+{
+	packetqueue_t pq;
+	int idx;
+	
+	// FIXME: This is wrong, we should better associate clients with sockets.
+	client_t *c = FindClient(s, 0);
+	
+	if (!c)
+	{
+		fprintf(stderr, "Cannot find client for socket %d\n", s.fd);
+		return -1;
+	}
+	
+	vec_foreach(&c->packetqueue_vec, pq, idx)
+	{
+		printf("Sending packet %d length %zu\n", ntohs(pq.p->opcode), pq.len);
+		
+		int sendlen = sendto(c->s.fd, pq.p, pq.len, 0, &c->s.addr.sa, sizeof(c->s.addr.sa));
+		if (sendlen == -1)
+		{
+			perror("sendto failed");
+			return -1;
+		}
+		
+		if (pq.allocated)
+			free(pq.p);
+	}
+	
+	vec_clear(&c->packetqueue_vec);
+	
+	SetSocketStatus(&c->s, SF_READABLE);
+	
+	if (c->destroy)
+	{
+		if (c->f)
+			fclose(c->f);
+		RemoveClient(c);
+	}
+	
+	return 0;
+}
+
+int ReceivePackets(socket_t s)
+{
+	socketstructs_t ss;
+	socklen_t addrlen = sizeof(ss);
+	uint8_t buf[MAX_PACKET_SIZE];
+	errno = 0;
+	size_t recvlen = recvfrom(s.fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
+	
+	// The kernel either told us that we need to read again
+	// or we received a signal and are continuing from where
+	// we left off.
+	if (recvlen == -1 && (errno == EAGAIN || errno == EINTR))
+		return 0;
+	else if (recvlen == -1)
+	{
+		fprintf(stderr, "Socket: Received an error when reading from the socket: %s\n", strerror(errno));
+		return -1;
+	}
+	
+	// Create our temp client socket
+	socket_t cs;
+	cs.fd = s.fd;
+	cs.type = s.type;
+	cs.addr = ss;
+	
+	// Either find the client or allocate a new client and socket
+	client_t *c = FindOrAllocateClient(cs);
+	
+	printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s.fd);
+	
+	// Process the packet received.
+	ProcessPacket(c, buf, recvlen);
+	
+	return 0;
 }
