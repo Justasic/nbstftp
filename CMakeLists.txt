@@ -205,7 +205,7 @@ if (GZIP)
 	
 	add_custom_command(
 		OUTPUT ${MAN_FILE}
-		COMMAND ${GZIP} ${CMAKE_BINARY_DIR}/nbstftp.8
+		COMMAND "${GZIP} < ${CMAKE_SOURCE_DIR}/nbstftp.8 > ${MAN_FILE}"
 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 		COMMENT "Compressing man page")
 	
