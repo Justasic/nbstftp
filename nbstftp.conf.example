@@ -38,7 +38,7 @@ server
 listen
 {
 	// Address to bind to (optional)
-	bind = "192.168.0.140";
+	bind = "0.0.0.0";
 	
 	// Port to listen on (69 by default)
 	//port = 69;

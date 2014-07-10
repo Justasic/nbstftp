@@ -49,15 +49,19 @@ list(SORT SOURCE_FILES)
 find_program(CLANG clang)
 find_program(CLANGXX clang++)
 
-# prefer clang instead of gcc (or whatever shit compiler they're using)
-if (CLANG)
-    set(CMAKE_C_COMPILER ${CLANG})
-endif (CLANG)
+# prefer clang instead of gcc (or whatever shit compiler they're using) This can be disabled with
+# the NO_CLANG option
+option(NO_CLANG "Don't prefer clang for compilation" OFF)
+if (${NO_CLANG})
+	if (CLANG)
+		set(CMAKE_C_COMPILER ${CLANG})
+	endif (CLANG)
 
-# In case we need to compile C++ in the future (which I doubt we will)
-if (CLANGXX)
-    set(CMAKE_CXX_COMPILER ${CLANGXX})
-endif (CLANGXX)
+	# In case we need to compile C++ in the future (which I doubt we will)
+	if (CLANGXX)
+		set(CMAKE_CXX_COMPILER ${CLANGXX})
+	endif (CLANGXX)
+endif (${NO_CLANG})
 
 # Finally initialize our project
 project(nbstftp C)
@@ -173,7 +177,7 @@ configure_file(${CMAKE_SOURCE_DIR}/cmake/sysconf.h.cmake ${CMAKE_BINARY_DIR}/sys
 include_directories(${CMAKE_BINARY_DIR})
 
 set(OUTPUT_FILE "${CMAKE_BINARY_DIR}/LICENSE.h")
-find_program(XXD xxd)
+find_program(XXD xxd REQUIRED)
 
 add_custom_command(
     OUTPUT ${OUTPUT_FILE}
@@ -186,8 +190,36 @@ add_custom_target(
     ALL DEPENDS
     ${OUTPUT_FILE})
 
+find_program(GZIP gzip)
+
 # Finally, tell CMake how to build the project
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${FLEX_LEXER_OUTPUTS} ${BISON_PARSER_OUTPUTS})
 set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE C COMPILE_FLAGS "${CFLAGS}")
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C PREFIX "" SUFFIX "" LINK_FLAGS "${LINKFLAGS}")
+
 add_dependencies(${PROJECT_NAME} license_headers)
+
+# Find and Generate our man page
+if (GZIP)
+	set(MAN_FILE "${CMAKE_BINARY_DIR}/nbstftp.8.gz")
+	
+	add_custom_command(
+		OUTPUT ${MAN_FILE}
+		COMMAND ${GZIP} ${CMAKE_BINARY_DIR}/nbstftp.8
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Compressing man page")
+	
+	add_custom_target(
+		manpage_generation
+		ALL DEPENDS
+		${MAN_FILE})
+	
+	add_dependencies(${PROJECT_NAME} manpage_generation)
+else(GZIP)
+	set(MAN_FILE "${CMAKE_SOURCE_DIR}/nbstftp.8")
+endif (GZIP)
+
+# Do the make install
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
+install(FILES ${CMAKE_SOURCE_DIR}/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
+install(FILES ${MAN_FILE} DESTINATION man)

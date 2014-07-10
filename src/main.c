@@ -22,6 +22,7 @@
 #include "misc.h"
 #include "signalhandler.h"
 #include "socket.h"
+#include "sysconf.h"
 //#include "packets.h"
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -87,7 +88,7 @@ int main(int argc, char **argv)
 	RegisterSignalHandlers();
 
 	if (!configfile)
-		configfile = "nbstftp.conf";
+		configfile = CMAKE_INSTALL_PREFIX "etc/nbstftp.conf";
 
 	if (ParseConfig(configfile) != 0)
 		die("Failed to parse the config file!");

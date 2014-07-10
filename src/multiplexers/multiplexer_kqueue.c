@@ -137,7 +137,6 @@ int ShutdownMultiplexer(void)
 	return 0;
 }
 
-extern socket_vec_t socketpool;
 void ProcessSockets(void)
 {
 	if (socketpool.length > events.capacity)
