@@ -12,22 +12,22 @@
 // Server configuration
 server
 {
-        // Directory to serve (manditory)
-        directory = "/tftpboot/";
+	// Directory to serve (manditory)
+	directory = "/tftpboot/";
 
-        // User to run the daemon as (default is to remain running as the
-        // user who executed the daemon)
-        //user = "someuser";
+	// User to run the daemon as (default is to remain running as the
+	// user who executed the daemon)
+	//user = "someuser";
 
-        // Group to run the daemon as (default is also to remain as executing user)
-        //group = "somegroup";
+	// Group to run the daemon as (default is also to remain as executing user)
+	//group = "somegroup";
 
-        // PID file location (defaults to /var/run/nbstftp.pid)
-        //pidfile = "/tmp/nbstftp.pid"
+	// PID file location (defaults to /var/run/nbstftp.pid)
+	//pidfile = "/tmp/nbstftp.pid"
 
-        // Whether or not to daemonize to the background (default is true)
-        //daemonize = true;
-	
+	// Whether or not to daemonize to the background (default is true)
+	//daemonize = true;
+
 	// Time between event iterations within the program, time is measured in
 	// seconds. The lower the seconds, the faster the program will respond to
 	// events but the more CPU it will use. (default is 5 seconds).
@@ -39,7 +39,7 @@ listen
 {
 	// Address to bind to (optional)
 	bind = "0.0.0.0";
-	
+
 	// Port to listen on (69 by default)
 	//port = 69;
 }
