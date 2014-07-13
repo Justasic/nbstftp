@@ -182,7 +182,7 @@ find_program(XXD xxd REQUIRED)
 add_custom_command(
     OUTPUT ${OUTPUT_FILE}
     COMMAND ${XXD} -i LICENSE ${OUTPUT_FILE}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/doc/
     COMMENT "Generating binary license header")
 
 add_custom_target(
@@ -201,5 +201,5 @@ add_dependencies(${PROJECT_NAME} license_headers)
 
 # Do the make install
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
-install(FILES ${CMAKE_SOURCE_DIR}/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
+install(FILES ${CMAKE_SOURCE_DIR}/doc/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
 # install(FILES ${MAN_FILE} DESTINATION man)
