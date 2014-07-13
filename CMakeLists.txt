@@ -52,7 +52,7 @@ find_program(CLANGXX clang++)
 # prefer clang instead of gcc (or whatever shit compiler they're using) This can be disabled with
 # the NO_CLANG option
 option(NO_CLANG "Don't prefer clang for compilation" OFF)
-if (${NO_CLANG})
+if (NOT NO_CLANG)
 	if (CLANG)
 		set(CMAKE_C_COMPILER ${CLANG})
 	endif (CLANG)
@@ -61,7 +61,7 @@ if (${NO_CLANG})
 	if (CLANGXX)
 		set(CMAKE_CXX_COMPILER ${CLANGXX})
 	endif (CLANGXX)
-endif (${NO_CLANG})
+endif (NOT NO_CLANG)
 
 # Finally initialize our project
 project(nbstftp C)
