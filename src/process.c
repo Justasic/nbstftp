@@ -28,7 +28,6 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	// Sanity check
 	if (len > MAX_PACKET_SIZE)
 	{
-// 		Error(c, ERROR_ILLEGAL, "Invalid packet size");
 		printf("Received an invalidly sized packet.\n");
 		return;
 	}
@@ -40,6 +39,13 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	switch(ntohs(p->opcode))
 	{
 		case PACKET_DATA:
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
+			
 			printf("Got a data packet\n");
 			if ((len > MAX_PACKET_SIZE))
 			{
@@ -66,6 +72,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			break;
 		case PACKET_ERROR:
 		{
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
 			// icky! -- Cast the packet_t pointer to a uint8_t then increment 4 bytes, then cast
 			// to a const char * and send to printf.
 #ifdef HAVE_STRNDUPA
@@ -100,6 +112,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		}
 		case PACKET_ACK:
 		{
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
 			char *addr1 = inet_ntoa(c->s.addr.in.sin_addr);
 			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
 			
@@ -127,6 +145,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		}
 		case PACKET_WRQ:
 		{
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
 #ifdef HAVE_STRNDUPA
 			char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
 			char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
@@ -179,6 +203,12 @@ end:
 		}
 		case PACKET_RRQ:
 		{
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
 #ifdef HAVE_STRNDUPA
 			// Get the filename and modes
 			//
@@ -242,8 +272,6 @@ end:
                 }
 		default:
 			printf("Got unknown packet: %d\n", ntohs(p->opcode));
-			// Unknown packets are ignored according to the RFC.
-			//Error(c, ERROR_ILLEGAL, "Unknown packet");
 			break;
 	}
 }

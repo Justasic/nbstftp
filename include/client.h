@@ -34,6 +34,8 @@ typedef struct client_s
 	uint16_t currentblockno;
         uint8_t waiting, sendingfile, destroy;
 	
+	packetqueue_t lastpacket;
+	
 	// Buffered packets. May use it later when a packet has not
 	// been received yet and we need to resend.
 	vec_t(packetqueue_t) packetqueue_vec;
@@ -57,4 +59,5 @@ extern client_t *FindClient(socket_t s, uint8_t compareport);
 // Either find a client or allocate a new one, also adds it to the linked list.
 extern client_t *FindOrAllocateClient(socket_t s);
 extern void DeallocateClients(void);
+extern void CheckClients(void);
 

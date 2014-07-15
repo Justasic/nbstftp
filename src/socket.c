@@ -259,6 +259,15 @@ void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 	
 	vec_push(&c->packetqueue_vec, pack);
 	
+	// We're a resend, no need to redo the packet copy.
+	if (allocated != 2)
+	{
+		// Copy the packet structure
+		memcpy(&c->lastpacket, &pack, sizeof(packetqueue_t));
+		c->lastpacket.p = nmalloc(len);
+		memcpy(c->lastpacket.p, p, len);
+	}
+	
 	// We're ready to write.
 	SetSocketStatus(&c->s, SF_WRITABLE | SF_READABLE);
 }
@@ -290,7 +299,7 @@ int SendPackets(socket_t s)
 			return -1;
 		}
 		
-		if (pq.allocated)
+		if (pq.allocated && pq.allocated != 2)
 			free(pq.p);
 	}
 	

@@ -120,7 +120,9 @@ int main(int argc, char **argv)
 	// Enter idle loop.
 	while (running)
 	{
-// 		printf("iteration!\n");
+		// Check the clients
+		CheckClients();
+		
 		// Process packets or wait on the sockets.
 		ProcessSockets();
 	}

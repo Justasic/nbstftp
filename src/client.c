@@ -152,3 +152,27 @@ void DeallocateClients(void)
 	// Deallocate the client pool
 	vec_deinit(&clientpool);
 }
+
+
+void CheckClients(void)
+{
+	client_t *c = NULL;
+	int i;
+	
+	vec_foreach(&clientpool, c, i)
+	{
+		if (c->waiting != 0)
+		{
+			if (c->waiting++ >= 3)
+			{
+				printf("Found client on socket %d taking too long\n", c->s.fd);
+				RemoveClient(c);
+				continue;
+			}
+			
+			printf("Resending last packet\n");
+			// Resend the packet
+			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);
+		}
+	}
+}

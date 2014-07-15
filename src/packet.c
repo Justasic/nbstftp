@@ -55,6 +55,9 @@ void SendData(client_t *c, void *data, size_t len)
 	
 	// Queue our packet for sending when EPoll comes around to send.
 	QueuePacket(c, p, len + sizeof(packet_t), 1);
+	
+	// Mark the client as waiting again
+	c->waiting = 1;
 }
 
 void Acknowledge(client_t *c, uint16_t blockno)
@@ -71,6 +74,9 @@ void Acknowledge(client_t *c, uint16_t blockno)
 	p.blockno = htons(blockno);
 	
 	QueuePacket(c, &p, sizeof(packet_t), 0);
+	
+	// Mark the client as waiting again
+	c->waiting = 1;
 }
 
 __attribute__((format(printf, 3, 4)))
@@ -114,6 +120,9 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	pptr[len] = 0;
 	
 	QueuePacket(c, p, len + sizeof(packet_t) + 1, 1);
+	
+	// Mark the client as waiting again
+	c->waiting = 1;
 
         free(buf);
 }
