@@ -1,0 +1,11 @@
+[Unit]
+Description=The No Bullshit TFTP server
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/nbstftp.pid
+ExecStart=/usr/bin/nbstftp
+
+[Install]
+WantedBy=multi-user.target

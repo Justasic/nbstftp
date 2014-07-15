@@ -21,7 +21,7 @@ prepare() {
 	cd nbstftp
 	mkdir build
 	cd build
-	
+
 	msg2 "Generating build..."
 	#cmake -DNO_CLANG=BOOLEAN:TRUE -DCMAKE_BUILD_TYPE:STRING=RELEASE -DCMAKE_INSTALL_PREFIX:STRING=/usr build
 	cmake -DNO_CLANG=BOOLEAN:TRUE -DCMAKE_BUILD_TYPE:STRING=RELEASE ..
@@ -38,12 +38,13 @@ package() {
 	cd "nbstftp/build"
 	msg2 "Installing..."
 	make DESTDIR="$pkgdir" install
-	
-	gzip < ../nbstftp.8 > nbstftp.8.gz
-	
+
+	gzip < ../doc/nbstftp.8 > nbstftp.8.gz
+
 	# Install all the license files
-	install -Dm644 ../LICENSE ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE
-	install -Dm644 ../LICENSE.reallocarray ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.reallocarray
-	install -Dm644 ../LICENSE.vec ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.vec
+	install -Dm644 ../doc/LICENSE ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE
+	install -Dm644 ../doc/LICENSE.reallocarray ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.reallocarray
+	install -Dm644 ../doc/LICENSE.vec ${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.vec
 	install -Dm644 nbstftp.8.gz ${pkgdir}/usr/share/man8/nbstftp.8.gz
+	install -Dm644 ../doc/nbstftp.service ${pkgdir}/usr/lib/systemd/system/nbstftp.service
 }

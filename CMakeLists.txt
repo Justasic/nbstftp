@@ -52,7 +52,7 @@ find_program(CLANGXX clang++)
 # prefer clang instead of gcc (or whatever shit compiler they're using) This can be disabled with
 # the NO_CLANG option
 option(NO_CLANG "Don't prefer clang for compilation" OFF)
-if (${NO_CLANG})
+if (NOT NO_CLANG)
 	if (CLANG)
 		set(CMAKE_C_COMPILER ${CLANG})
 	endif (CLANG)
@@ -61,7 +61,7 @@ if (${NO_CLANG})
 	if (CLANGXX)
 		set(CMAKE_CXX_COMPILER ${CLANGXX})
 	endif (CLANGXX)
-endif (${NO_CLANG})
+endif (NOT NO_CLANG)
 
 # Finally initialize our project
 project(nbstftp C)
@@ -182,7 +182,7 @@ find_program(XXD xxd REQUIRED)
 add_custom_command(
     OUTPUT ${OUTPUT_FILE}
     COMMAND ${XXD} -i LICENSE ${OUTPUT_FILE}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/doc/
     COMMENT "Generating binary license header")
 
 add_custom_target(
@@ -201,5 +201,5 @@ add_dependencies(${PROJECT_NAME} license_headers)
 
 # Do the make install
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
-install(FILES ${CMAKE_SOURCE_DIR}/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
+install(FILES ${CMAKE_SOURCE_DIR}/doc/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
 # install(FILES ${MAN_FILE} DESTINATION man)
