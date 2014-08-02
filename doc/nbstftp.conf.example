@@ -34,12 +34,23 @@ server
 	readtimeout = 5;
 }
 
-// Listen block, Add as many as you need.
+// IPV4 Listen block, you can add as many as you need.
 listen
 {
-	// Address to bind to (optional)
+	// Address to bind to (optional, default is IPv6 ::)
 	bind = "0.0.0.0";
 
 	// Port to listen on (69 by default)
 	//port = 69;
 }
+
+// IPv6 listen block
+listen
+{
+    // Address to bind to, this value is the same as the default value.
+    bind = "::";
+
+    // Port to listen on (69 by default)
+    port = 69;
+}
+

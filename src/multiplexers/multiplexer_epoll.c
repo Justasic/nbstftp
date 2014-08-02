@@ -145,6 +145,13 @@ void ProcessSockets(void)
 		if (FindSocket(ev->data.fd, &s) == -1)
 		{
 			fprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->data.fd);
+			// We don't know what socket this is. Someone added something
+			// stupid somewhere so shut this shit down now.
+			// We have to create a temporary socket_t object to remove it
+			// from the multiplexer, then we can close it.
+			socket_t tmp = { ev->data.fd, 0, 0, 0, 0 };
+			RemoveFromMultiplexer(tmp);
+			close(ev->data.fd);
 			continue;
 		}
 		
