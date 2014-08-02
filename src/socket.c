@@ -301,7 +301,7 @@ int SendPackets(socket_t s)
 	{
 		printf("Sending packet %d length %zu\n", ntohs(pq.p->opcode), pq.len);
 		
-		int sendlen = sendto(c->s.fd, pq.p, pq.len, 0, &c->s.addr.sa, sizeof(c->s.addr.sa));
+		int sendlen = sendto(c->s.fd, pq.p, pq.len, 0, &c->s.addr.sa, c->s.addr.sa.sa_family == AF_INET ? sizeof(c->s.addr.in) : sizeof(c->s.addr.in6));
 		if (sendlen == -1)
 		{
 			perror("sendto failed");
