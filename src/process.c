@@ -96,8 +96,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// do things wrong. So here we deallocate if we run into any
 			// kind of error.
 
-                        if (c->sendingfile)
-                        {
+			if (c->sendingfile)
+			{
 				printf("Aborting file transfer.\n");
 				// Close the file and clean up.
 				fclose(c->f);
@@ -118,8 +118,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				free(c->lastpacket.p);
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
-			char *addr1 = inet_ntoa(c->s.addr.in.sin_addr);
-			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), addr1);
+
+			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), GetAddress(c->s.addr));
 			
 			if (c->sendingfile)
 			{

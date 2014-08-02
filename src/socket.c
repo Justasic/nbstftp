@@ -160,7 +160,7 @@ short GetPort(socket_t s)
 		return ntohs(s.addr.in.sin_port);
 	// Otherwise, get IPv6 port
 	else if(s.addr.sa.sa_family == AF_INET6)
-		return htons(s.addr.in6.sin6_port);
+		return ntohs(s.addr.in6.sin6_port);
 	
 	return -1;
 }
@@ -174,8 +174,9 @@ const char *GetAddress(socketstructs_t saddr)
 
 void DestroySocket(socket_t s, uint8_t closefd)
 {
-	// First, remove it from the EPoll system.
-	RemoveFromMultiplexer(s);
+	// First, remove it from the multiplexer system, but ONLY if we plan on closing it too.
+	if (closefd)
+		RemoveFromMultiplexer(s);
 
 	// Now remove it from our vector
 	for (int idx = 0; idx < socketpool.length; idx++)
@@ -219,7 +220,7 @@ int InitializeSockets(void)
 			block->port = 69;
 		
 		if (!block->bindaddr)
-			block->bindaddr = strdup("0.0.0.0");
+			block->bindaddr = strdup("::");
 		
 		if (BindToSocket(block->bindaddr, block->port) == -1)
 		{
@@ -354,7 +355,7 @@ int ReceivePackets(socket_t s)
 	// Either find the client or allocate a new client and socket
 	client_t *c = FindOrAllocateClient(cs);
 	
-	printf("Received %zu bytes from %s on socket %d\n", recvlen, GetAddress(cs.addr), s.fd);
+	printf("Received %zu bytes from %s:%d on socket %d\n", recvlen, GetAddress(cs.addr), GetPort(cs), s.fd);
 	
 	// Process the packet received.
 	ProcessPacket(c, buf, recvlen);

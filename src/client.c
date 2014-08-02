@@ -20,6 +20,7 @@ typedef struct client_s client_t;
 #include "misc.h"
 #include <assert.h>
 #include <errno.h>
+#include <time.h>
 
 client_vec_t clientpool;
 
@@ -68,7 +69,7 @@ client_t *FindOrAllocateClient(socket_t cs)
 void RemoveClient(client_t *c)
 {
 	assert(c);
-
+	
 	// Remove the socket from the socket pool
 	DestroySocket(c->s, 0);
 	
@@ -161,7 +162,7 @@ void CheckClients(void)
 	
 	vec_foreach(&clientpool, c, i)
 	{
-		if (c->waiting != 0)
+		if (c->waiting != 0 && c->nextresend <= time(NULL))
 		{
 			if (c->waiting++ >= 3)
 			{
@@ -173,6 +174,7 @@ void CheckClients(void)
 			printf("Resending last packet\n");
 			// Resend the packet
 			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);
+			c->nextresend = time(NULL) + 5;
 		}
 	}
 }

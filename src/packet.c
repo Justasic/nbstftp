@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <time.h>
 #include "client.h"
 #include "misc.h"
 #include "socket.h"
@@ -58,6 +59,7 @@ void SendData(client_t *c, void *data, size_t len)
 	
 	// Mark the client as waiting again
 	c->waiting = 1;
+	c->nextresend = time(NULL) + 5;
 }
 
 void Acknowledge(client_t *c, uint16_t blockno)
@@ -77,6 +79,7 @@ void Acknowledge(client_t *c, uint16_t blockno)
 	
 	// Mark the client as waiting again
 	c->waiting = 1;
+	c->nextresend = time(NULL) + 5;
 }
 
 __attribute__((format(printf, 3, 4)))
@@ -123,6 +126,7 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	
 	// Mark the client as waiting again
 	c->waiting = 1;
+	c->nextresend = time(NULL) + 5;
 
         free(buf);
 }

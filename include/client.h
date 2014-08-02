@@ -33,6 +33,7 @@ typedef struct client_s
         // Status variables
 	uint16_t currentblockno;
         uint8_t waiting, sendingfile, destroy;
+	time_t nextresend;
 	
 	packetqueue_t lastpacket;
 	
