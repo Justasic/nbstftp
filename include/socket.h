@@ -47,3 +47,4 @@ extern int FindSocket(int fd, socket_t *s);
 extern void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated);
 extern int SendPackets(socket_t s);
 extern int ReceivePackets(socket_t s);
+extern const char *GetAddress(socketstructs_t saddr);

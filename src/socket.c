@@ -26,6 +26,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "vec.h"
 #include "multiplexer.h"
@@ -44,10 +45,15 @@ int BindToSocket(const char *addr, short port)
 	socketstructs_t saddr;
 	memset(&saddr, 0, sizeof(socketstructs_t));
 
+	// Get the address fanily
 	saddr.sa.sa_family = strstr(addr, ":") != NULL ? AF_INET6 : AF_INET;
-	saddr.in.sin_port = htons(port);
 	
-	switch (inet_pton(saddr.sa.sa_family, addr, &saddr.in.sin_addr))
+	printf("Address family is: %s\n", saddr.sa.sa_family == AF_INET6 ? "AF_INET6" : "AF_INET" );
+	
+	// Set our port
+	*(saddr.sa.sa_family == AF_INET ? &saddr.in.sin_port : &saddr.in6.sin6_port) = htons(port);
+	
+	switch (inet_pton(saddr.sa.sa_family, addr, (saddr.sa.sa_family == AF_INET ? &saddr.in.sin_addr : &saddr.in6.sin6_addr)))
 	{
 		case 1: // Success.
 			break;
@@ -76,7 +82,7 @@ int BindToSocket(const char *addr, short port)
 	}
 
 	// Bind to the socket
-	if (bind(fd, &saddr.sa, sizeof(saddr.sa)) < 0)
+	if (bind(fd, &saddr.sa, saddr.sa.sa_family == AF_INET ? sizeof(saddr.in) : sizeof(saddr.in6)) < 0)
 	{
 		perror("bind failed");
 		close(fd);
@@ -96,7 +102,7 @@ int BindToSocket(const char *addr, short port)
 int AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t binding, socket_t *s)
 {
 	if (!addr)
-		addr = inet_ntoa(saddr.in.sin_addr);
+		addr = GetAddress(saddr);
 	
 	socket_t sock;
 	sock.bindaddr = strdup(addr);
@@ -159,6 +165,13 @@ short GetPort(socket_t s)
 	return -1;
 }
 
+const char *GetAddress(socketstructs_t saddr)
+{
+	static char str[INET6_ADDRSTRLEN+1];
+	
+	return inet_ntop(saddr.sa.sa_family, &saddr.sa, str, INET6_ADDRSTRLEN);
+}
+
 void DestroySocket(socket_t s, uint8_t closefd)
 {
 	// First, remove it from the EPoll system.
@@ -210,20 +223,16 @@ int InitializeSockets(void)
 		
 		if (BindToSocket(block->bindaddr, block->port) == -1)
 		{
-			fprintf(stderr, "Failed to bind to %s:%d\n", block->bindaddr, block->port);
+			int isipv6 = strstr(block->bindaddr, ":") != NULL;
+			fprintf(stderr, "Failed to bind to %c%s%c:%d\n",
+				(isipv6 ? '[' : '\0'), block->bindaddr, (isipv6 ? ']' : '\0'), block->port);
 			continue;
 		}
 		bound = 1;
 	}
 	
 	// If we didn't find an interface to bind to, exit.
-	if (!bound)
-	{
-		fprintf(stderr, "Failed to find an interface to bind to!\n");
-		return -1;
-	}
-	
-	return 0;
+	return bound ? 0 : -1;
 }
 
 void ShutdownSockets(void)
@@ -345,7 +354,7 @@ int ReceivePackets(socket_t s)
 	// Either find the client or allocate a new client and socket
 	client_t *c = FindOrAllocateClient(cs);
 	
-	printf("Received %zu bytes from %s on socket %d\n", recvlen, inet_ntoa(cs.addr.in.sin_addr), s.fd);
+	printf("Received %zu bytes from %s on socket %d\n", recvlen, GetAddress(cs.addr), s.fd);
 	
 	// Process the packet received.
 	ProcessPacket(c, buf, recvlen);
