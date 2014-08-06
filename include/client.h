@@ -20,6 +20,8 @@
 #include "vec.h"
 #include "socket.h"
 
+typedef short int tid_t;
+
 typedef struct packetqueue_s
 {
 	packet_t *p;
@@ -34,15 +36,18 @@ typedef struct client_s
 	uint16_t currentblockno;
         uint8_t waiting, sendingfile, destroy;
 	time_t nextresend;
-	
+
 	packetqueue_t lastpacket;
-	
+
 	// Buffered packets. May use it later when a packet has not
 	// been received yet and we need to resend.
 	vec_t(packetqueue_t) packetqueue_vec;
 
         // Current file we're sending
         FILE *f;
+
+        // The client's Transfer ID, just the udp port
+        tid_t tid;
 } client_t;
 
 typedef vec_t(client_t*) client_vec_t;
@@ -56,7 +61,7 @@ extern void RemoveClient(client_t *c);
 // Compare two clients and check if they're equal
 extern int CompareClients(client_t *c1, client_t *c2);
 // Find a client based on their socket structure.
-extern client_t *FindClient(socket_t s, uint8_t compareport);
+extern client_t *FindClient(socket_t s);
 // Either find a client or allocate a new one, also adds it to the linked list.
 extern client_t *FindOrAllocateClient(socket_t s);
 extern void DeallocateClients(void);

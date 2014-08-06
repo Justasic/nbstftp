@@ -27,9 +27,9 @@ client_vec_t clientpool;
 void AddClient(client_t *c)
 {
 	assert(c);
-	
+
 	vec_push(&clientpool, c);
-	
+
 	vec_init(&c->packetqueue_vec);
 	// Make sure we could add the socket.
 	if (errno == ENOMEM)
@@ -37,29 +37,32 @@ void AddClient(client_t *c)
 		fprintf(stderr, "Failed to add client to client pool!\n");
 		RemoveClient(c);
 	}
+
+	// The transfer ID is given as the port.
+	c->tid = -GetPort(c->s);
 }
 
 client_t *FindOrAllocateClient(socket_t cs)
 {
-	client_t *found = FindClient(cs, 1);
+	client_t *found = FindClient(cs);
 
 	if (!found)
 	{
 		found = nmalloc(sizeof(client_t));
-		// Make a permanent socket which gets added to the socket vector.
+		// Make a semi-permanent socket which gets added to the socket vector.
 		if (AddSocket(cs.fd, NULL, cs.type, cs.addr, 0, &found->s) == -1)
 		{
 			free(found);
 			return NULL;
 		}
-		
+
 		vec_init(&found->packetqueue_vec);
 		if (errno == ENOMEM)
 		{
 			fprintf(stderr, "Failed to allocate packet queue!\n");
 			return NULL;
 		}
-		
+
 		AddClient(found);
 	}
 
@@ -69,13 +72,13 @@ client_t *FindOrAllocateClient(socket_t cs)
 void RemoveClient(client_t *c)
 {
 	assert(c);
-	
+
 	// Remove the socket from the socket pool
 	DestroySocket(c->s, 0);
-	
+
 	// Remove the client from the client pool
 	vec_remove(&clientpool, c);
-	
+
 	// Destroy the packet queue
 	vec_deinit(&c->packetqueue_vec);
 
@@ -83,16 +86,22 @@ void RemoveClient(client_t *c)
 	free(c);
 }
 
+
+
 int CompareClients(client_t *c1, client_t *c2)
 {
 	assert(c1);
 	assert(c2);
 
+	return c1->tid == c2->tid;
+
+#if 0
+
 	assert(c1->s.addr.sa.sa_family == AF_INET ||
 		c1->s.addr.sa.sa_family == AF_INET6);
 	assert(c2->s.addr.sa.sa_family == AF_INET ||
 		c2->s.addr.sa.sa_family == AF_INET6);
-	
+
 	socket_t s1 = c1->s, s2 = c2->s;
 
         // First, compare address types, if they're not a match then
@@ -117,39 +126,37 @@ int CompareClients(client_t *c1, client_t *c2)
         // (should) never be reached but compilers whine about this not
         // being here so here it is.
         return 0;
+#endif
 }
 
-client_t *FindClient(socket_t s, uint8_t compareport)
+client_t *FindClient(socket_t s)
 {
 	for (int idx = 0; idx < (&clientpool)->length; idx++)
+	{
 		if ((&clientpool)->data[idx]->s.fd == s.fd)
 		{
 			client_t *c = (&clientpool)->data[idx];
-			if (compareport)
-			{
-				if (GetPort(c->s) == GetPort(s))
-					return c;
-			}
-			else
+			if (c->tid == -GetPort(s))
 				return c;
 		}
-        
-        // Couldn't find the client, fall through to return NULL.
-        return NULL;
+	}
+
+	// Couldn't find the client, fall through to return NULL.
+	return NULL;
 }
 
 void DeallocateClients(void)
 {
 	client_t *c = NULL;
 	int i;
-	
+
 	// Deallocate any remaining packets and the client's queue.
 	vec_foreach(&clientpool, c, i)
 	{
 		vec_deinit(&c->packetqueue_vec);
 		free(c);
 	}
-	
+
 	// Deallocate the client pool
 	vec_deinit(&clientpool);
 }
@@ -159,18 +166,18 @@ void CheckClients(void)
 {
 	client_t *c = NULL;
 	int i;
-	
+
 	vec_foreach(&clientpool, c, i)
 	{
 		if (c->waiting != 0 && c->nextresend <= time(NULL))
 		{
 			if (c->waiting++ >= 3)
 			{
-				printf("Found client on socket %d taking too long\n", c->s.fd);
+				printf("Found client on socket %d taking too long... Terminating transfer.\n", c->s.fd);
 				RemoveClient(c);
 				continue;
 			}
-			
+
 			printf("Resending last packet\n");
 			// Resend the packet
 			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);

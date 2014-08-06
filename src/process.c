@@ -31,11 +31,11 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		printf("Received an invalidly sized packet.\n");
 		return;
 	}
-	
+
 	assert(buffer);
 
 	const packet_t *p = buffer;
-	
+
 	switch(ntohs(p->opcode))
 	{
 		case PACKET_DATA:
@@ -45,7 +45,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				free(c->lastpacket.p);
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
-			
+
 			printf("Got a data packet\n");
 			if ((len > MAX_PACKET_SIZE))
 			{
@@ -120,18 +120,18 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			}
 
 			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), GetAddress(c->s.addr));
-			
+
 			if (c->sendingfile)
 			{
 				uint8_t buf[512];
 				memset(buf, 0, sizeof(buf));
 				size_t readlen = fread(buf, 1, sizeof(buf), c->f);
-				
+
 				c->currentblockno++;
-				
+
 				// Sending a file
 				SendData(c, buf, readlen);
-				
+
 				// We're at the end of the file.
 				if (MIN(512, readlen) != 512)
 				{
@@ -170,8 +170,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 
 			int imode = strcasecmp(mode, "netascii");
 
-			char tmp[(1 << 16)];
-			sprintf(tmp, "%s/%s", config->directory, filename);
+			char *tmp = NULL;
+			asprintf(&tmp, "%s/%s", config->directory, filename);
 
 			printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
 
@@ -199,6 +199,7 @@ end:
 			free(filename);
 			free(mode);
 #endif
+			free(tmp);
 			break;
 		}
 		case PACKET_RRQ:
@@ -225,7 +226,7 @@ end:
 			char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
 			char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
 #endif
-			
+
 			// mode can be "netascii", "octet", or "mail" case insensitive.
 			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
 
@@ -238,8 +239,8 @@ end:
 
 			int imode = strcasecmp(mode, "netascii");
 
-			char tmp[(1 << 16)];
-			sprintf(tmp, "%s/%s", config->directory, filename);
+			char *tmp = NULL;
+			asprintf(&tmp, "%s/%s", config->directory, filename);
 
 			if (!FileExists(tmp))
 				Error(c, ERROR_NOFILE, "File %s does not exist on the filesystem.", tmp);
@@ -252,7 +253,13 @@ end:
 				break;
 			}
 
-			printf("File \"%s\" is available, sending first packet\n", tmp);
+			fseek(f, 0, SEEK_END);
+			size_t len = ftell(f);
+			rewind(f);
+
+			char *tmp2 = SizeReduce(len);
+			printf("File \"%s\" is %s long, sending first packet\n", tmp, tmp2);
+			free(tmp2);
 
 			// file buffer
 			uint8_t buf[512];
@@ -267,6 +274,7 @@ end:
 			free(filename);
 			free(mode);
 #endif
+			free(tmp);
 
 			break;
                 }

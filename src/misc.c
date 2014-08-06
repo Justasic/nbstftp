@@ -29,7 +29,7 @@ void die(const char *msg, ...)
 {
 	va_list ap;
 	va_start(ap, msg);
-	
+
 	size_t len = strlen(msg) * 2;
 	char *str = malloc(len);
 	if (!str)
@@ -39,13 +39,13 @@ void die(const char *msg, ...)
 		fprintf(stderr, "Previous unformatted error message was: \"%s\"\n", msg);
 		exit(EXIT_FAILURE);
 	}
-	
+
 	int newlen = vsnprintf(str, len, msg, ap);
 	va_end(ap);
-	
+
 	fprintf(stderr, "FATAL: %s\n", str);
 	free(str);
-	
+
 	exit(EXIT_FAILURE);
 }
 
@@ -58,17 +58,17 @@ void *nmalloc(size_t sz)
 {
 	// Allocate the pointer, allocate 1 byte if there was an integer overflow.
 	void *ptr = malloc(sz ? sz : 1);
-	
+
 	// Make sure no errors happened.
 	if (!ptr)
 	{
 		fprintf(stderr, "FATAL: Cannot allocate memory: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-	
+
 	// ensure the memory space is null.
 	memset(ptr, 0, sz);
-	
+
 	// bye!
 	return ptr;
 }
@@ -77,30 +77,30 @@ int vasprintf(char **str, const char *fmt, va_list args)
 {
 	int size = 0;
 	va_list tmpa;
-	
+
 	// copy
 	va_copy(tmpa, args);
-	
+
 	// apply variadic arguments to
 	// sprintf with format to get size
 	size = vsnprintf(NULL, size, fmt, tmpa);
-	
+
 	// toss args
 	va_end(tmpa);
-	
+
 	// return -1 to be compliant if
 	// size is less than 0
 	if (size < 0)
 		return -1;
-	
+
 	// alloc with size plus 1 for `\0'
 	*str = malloc(size + 1);
-	
+
 	// return -1 to be compliant
 	// if pointer is `NULL'
 	if (!*str)
 		return -1;
-	
+
 	// format string with original
 	// variadic arguments and set new size
 	return vsprintf(*str, fmt, args);
@@ -114,7 +114,7 @@ int SwitchUserAndGroup(const char *user, const char *group)
 	// It simply means do nothing.
 	if (!user && !group)
 		return 0;
-	
+
 	if (user)
 	{
 		errno = 0;
@@ -124,13 +124,13 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			fprintf(stderr, "Cannot getpwnam %s: %s\n", user, strerror(errno));
 			return 1;
 		}
-		
+
 		if (setuid(pass->pw_uid) == -1)
 		{
 			fprintf(stderr, "Cannot setuid to %s: %s\n", user, strerror(errno));
 			return 1;
 		}
-		
+
 		// Save on one syscall at least.
 		if (group && !strcmp(user, group))
 		{
@@ -143,7 +143,7 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			return 0;
 		}
 	}
-	
+
 	if (group)
 	{
 		errno = 0;
@@ -153,27 +153,27 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
 			return 1;
 		}
-		
+
 		if (setgid(grp->gr_gid) == -1)
 		{
 			fprintf(stderr, "Cannot setgid to %s: %s\n", group, strerror(errno));
 			return 1;
 		}
 	}
-	
+
 	return 0;
 }
 
 int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions)
 {
 	assert(file);
-	
+
 	if (!user && !group)
 		return 0;
-	
+
 	uid_t uid = 0;
 	gid_t gid = 0;
-	
+
 	if (user)
 	{
 		errno = 0;
@@ -184,7 +184,7 @@ int SetFilePermissions(const char *file, const char *user, const char *group, mo
 			return 1;
 		}
 		uid = pass->pw_uid;
-		
+
 		// Save on one syscall at least.
 		if (group && !strcmp(user, group))
 		{
@@ -192,7 +192,7 @@ int SetFilePermissions(const char *file, const char *user, const char *group, mo
 			goto perms;
 		}
 	}
-	
+
 	if (group)
 	{
 		errno = 0;
@@ -202,23 +202,23 @@ int SetFilePermissions(const char *file, const char *user, const char *group, mo
 			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
 			return 1;
 		}
-		
+
 		gid = grp->gr_gid;
 	}
-	
+
 perms:
 	if (chown(file, uid, gid) == -1)
 	{
 		fprintf(stderr, "Failed to set owner on file %s to %s %s: %s\n", file, user, group, strerror(errno));
 		return 1;
 	}
-	
+
 	if (chmod(file, permissions) == -1)
 	{
 		fprintf(stderr, "Failed to set permissions on file %s to %.4d\n", file, permissions);
 		return 1;
 	}
-	
+
 	return 0;
 }
 
@@ -234,23 +234,46 @@ void Daemonize(void)
 	if (!nofork && InTerm())
 	{
 		int i = fork();
-		
+
 		// Exit our parent process.
 		if (i > 0)
 			exit(EXIT_SUCCESS);
-		
+
 		// Say our PID to the console.
 		printf("Going away from console, pid: %d\n", getpid());
-		
+
 		// Close all the file descriptors so printf and shit goes
 		// away. This can later be used for logging instead.
 		freopen("/dev/null", "r", stdin);
 		freopen("/dev/null", "w", stdout);
 		freopen("/dev/null", "w", stderr);
-		
+
 		if (setpgid(0, 0) < 0)
 			die("Unable to setpgid()");
 		else if (i == -1)
 			die("Unable to daemonize");
 	}
+}
+
+char *SizeReduce(size_t size)
+{
+	static char *sizes[] = {
+		"B",
+		"KB",
+		"MB",
+		"GB",
+		"TB",
+		"PB",
+		"EB",
+		"ZB",
+		"YB"
+	};
+
+	int sz = 0;
+	for (sz = 0; size > 1024; size >>= 1, sz++)
+		;
+
+	char *str = NULL;
+	asprintf(&str, "%zu %s", size, sizes[sz]);
+	return str;
 }
