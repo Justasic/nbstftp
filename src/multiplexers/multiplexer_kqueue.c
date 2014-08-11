@@ -15,7 +15,7 @@
 #include "sysconf.h"
 
 #ifndef HAVE_KQUEUE
-# error You probably shouldn't be trying to compile a kqueue multiplexer on a kqueue-unsupported platform. Try again.
+# error "You probably shouldn't be trying to compile a kqueue multiplexer on a kqueue-unsupported platform. Try again."
 #endif
 
 #include "multiplexer.h"

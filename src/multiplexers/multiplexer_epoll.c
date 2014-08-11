@@ -15,7 +15,7 @@
 #include "sysconf.h"
 
 #ifndef HAVE_SYS_EPOLL_H
-# error You probably shouldn't be trying to compile an epoll multiplexer on a epoll-unsupported platform. Try again.
+# error "You probably shouldn't be trying to compile an epoll multiplexer on a epoll-unsupported platform. Try again."
 #endif
 
 #include "multiplexer.h"

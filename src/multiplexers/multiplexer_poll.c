@@ -15,7 +15,7 @@
 #include "sysconf.h"
 
 #ifndef HAVE_POLL
-# error You probably shouldn't be trying to compile an poll multiplexer on a poll-unsupported platform. Try again.
+# error "You probably shouldn't be trying to compile an poll multiplexer on a poll-unsupported platform. Try again."
 #endif
 
 #include <sys/poll.h>

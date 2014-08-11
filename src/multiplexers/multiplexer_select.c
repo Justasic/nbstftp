@@ -15,7 +15,7 @@
 #include "sysconf.h"
 
 #ifndef HAVE_SELECT
-# error You probably shouldn't be trying to compile a select multiplexer on a select-unsupported platform. Try again.
+# error "You probably shouldn't be trying to compile a select multiplexer on a select-unsupported platform. Try again."
 #endif
 
 #include <sys/types.h>
