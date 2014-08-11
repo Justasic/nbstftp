@@ -63,7 +63,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			// otherwise, just ignore it because it's not ours.
 			if (c->sendingfile)
 			{
-				size_t flen = fwrite(p+sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
+				size_t flen = fwrite(((uint8_t*)p) + sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
 				printf("Wrote block %d of length %zu\n", ntohs(p->blockno), flen);
 
 				Acknowledge(c, ntohs(p->blockno));
