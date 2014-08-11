@@ -70,10 +70,21 @@ include (CheckCCompilerFlag)
 
 # Make sure the compiler accepts C11
 check_c_compiler_flag(-std=c11 HAVE_C11_FLAG)
-set(CFLAGS "${CFLAGS} -std=c11 -g -Werror=implicit-function-declaration")
+set(CFLAGS "${CFLAGS} -g -Werror=implicit-function-declaration")
 
 if (NOT HAVE_C11_FLAG)
-    message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
+	#If the compiler doesn't have the -std=c11 flag, try and use the -std=c1x but let the user
+	# know that we may not be able to compile.
+	check_c_compiler_flag(-std=c1x HAVE_C1X_FLAG)
+	
+	if (NOT HAVE_C1X_FLAG)
+		message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
+	else (NOT HAVE_C1X_FLAG)
+		message(WARNING "Your compiler appears to support an older version of C11, the compile may fail! Please update your compiler before reporting any bugs!")
+		set(CFLAGS "${CFLAGS} -std=c1x")
+	endif (NOT HAVE_C1X_FLAG)
+else (NOT HAVE_C11_FLAG)
+	set(CFLAGS "${CFLAGS} -std=c11")
 endif (NOT HAVE_C11_FLAG)
 
 # Add some feature test macro definitions.
