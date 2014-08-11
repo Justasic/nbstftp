@@ -34,6 +34,11 @@ int FileExists(const char *file)
 		return 0;
 	else
 		fclose(input);
+	
+	// Do a final access check to make sure we can read it
+	// otherwise it's pointless to report a file we can't read.
+	if (access(file, R_OK) == -1)
+		return 0;
 
 	return 1;
 }

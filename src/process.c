@@ -21,6 +21,12 @@
 #include <errno.h>
 #include "sysconf.h"
 #include <strings.h>
+#include <unistd.h>
+
+// NOTE:
+// This file is a bit of a mess but it works for now.
+// The main thing about this file is that every packet received
+// goes here and is handled here.
 
 // Process the incoming packet.
 void ProcessPacket(client_t *c, void *buffer, size_t len)
@@ -100,8 +106,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			{
 				printf("Aborting file transfer.\n");
 				// Close the file and clean up.
-				fclose(c->f);
-				RemoveClient(c);
+				c->destroy = 1;
 			}
 
 #ifndef HAVE_STRNDUPA
@@ -172,16 +177,31 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 
 			char *tmp = NULL;
 			asprintf(&tmp, "%s/%s", config->directory, filename);
-
-			printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
-
-			FILE *f = fopen(mode, imode == 0 ? "wt" : "wb");
-			if (!f)
+			
+			// Something's fucked. We're out of memory, try and abort peacefully.
+			if (!tmp)
+			{
+				Error(c, ERROR_UNDEFINED, "Out of Memory");
+				break;
+			}
+			
+			printf("Checking we can open file \"%s\"\n", tmp);
+			
+			// Check that we have access to that file
+			if (access(tmp, W_OK) == -1 || access(config->directory, W_OK) == -1)
 			{
 				if (errno == EACCES)
+				{
 					Error(c, ERROR_NOUSER, "Cannot access file: %s", strerror(errno));
-				else
-					Error(c, ERROR_NOFILE, "Cannot read file: %s", strerror(errno));
+					goto end;
+				}
+			}
+
+			printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
+			FILE *f = fopen(tmp, imode == 0 ? "wt" : "wb");
+			if (!f)
+			{
+				Error(c, ERROR_NOFILE, "Cannot write file: %s", strerror(errno));
 				goto end;
 			}
 

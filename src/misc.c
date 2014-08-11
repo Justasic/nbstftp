@@ -14,6 +14,7 @@
  */
 
 #include "misc.h"
+#include "config.h"
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
@@ -160,6 +161,18 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			return 1;
 		}
 	}
+	
+	// Check our directory permissions
+	int r = access(config->directory, R_OK) + 1, w = access(config->directory, W_OK) + 1;
+	if (!r && !w)
+	{
+		fprintf(stderr, "FATAL: Cannot read or write files in %s\n", config->directory);
+		return 1;
+	}
+	else if (!r && w)
+		fprintf(stderr, "WARNING: \"%s:%s\" cannot read serve folder \"%s\"", user, group, config->directory);
+	else if (r && !w)
+		fprintf(stderr, "WARNING: \"%s:%s\" cannot write to serve folder \"%s\"", user, group, config->directory);
 
 	return 0;
 }

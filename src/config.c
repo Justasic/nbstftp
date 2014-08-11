@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 extern FILE *yyin;
 extern int yyparse();
@@ -82,7 +83,10 @@ int ParseConfig(const char *filename)
 		fprintf(stderr, "Error: Read Timeout time can be no less than 1 second! Setting to default of 5.\n");
 		config->readtimeout = 5;
 	}
-
+	
+	// It is stupid to do an access check here and should be done when
+	// we're about to switch users (or just after)
+	
 	return ret;
 }
 

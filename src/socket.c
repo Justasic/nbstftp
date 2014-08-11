@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -277,6 +278,10 @@ void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 		c->lastpacket.p = nmalloc(len);
 		memcpy(c->lastpacket.p, p, len);
 	}
+	
+	// Mark the client as waiting again
+	c->waiting = 1;
+	c->nextresend = time(NULL) + 5;
 
 	// We're ready to write.
 	SetSocketStatus(&c->s, SF_WRITABLE | SF_READABLE);
@@ -316,8 +321,13 @@ int SendPackets(socket_t s)
 
 		if (c->destroy)
 		{
+			// If we're reading or writing a file, close it.
 			if (c->f)
+			{
+				fflush(c->f);
 				fclose(c->f);
+			}
+			
 			RemoveClient(c);
 		}
 	}
@@ -331,7 +341,8 @@ int ReceivePackets(socket_t s)
 	socklen_t addrlen = sizeof(ss);
 	uint8_t buf[MAX_PACKET_SIZE];
 	errno = 0;
-	size_t recvlen = recvfrom(s.fd, buf, sizeof(buf), 0, &ss.sa, &addrlen);
+	memset(buf, 0, sizeof(buf));
+	size_t recvlen = recvfrom(s.fd, buf, MAX_PACKET_SIZE, 0, &ss.sa, &addrlen);
 
 	// The kernel either told us that we need to read again
 	// or we received a signal and are continuing from where

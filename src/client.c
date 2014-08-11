@@ -72,15 +72,28 @@ client_t *FindOrAllocateClient(socket_t cs)
 void RemoveClient(client_t *c)
 {
 	assert(c);
+	packetqueue_t pq;
+	int idx;
 
 	// Remove the socket from the socket pool
 	DestroySocket(c->s, 0);
 
 	// Remove the client from the client pool
 	vec_remove(&clientpool, c);
+	
+	// Free any remaining packets that are in the packet queue
+	vec_foreach(&c->packetqueue_vec, pq, idx)
+	{
+		if (pq.allocated)
+			free(pq.p);
+	}
 
 	// Destroy the packet queue
 	vec_deinit(&c->packetqueue_vec);
+	
+	// Destroy any allocated resend packets
+	if (c->lastpacket.allocated)
+		free(c->lastpacket.p);
 
 	// Delete the client
 	free(c);
@@ -181,7 +194,7 @@ void CheckClients(void)
 			printf("Resending last packet\n");
 			// Resend the packet
 			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);
-			c->nextresend = time(NULL) + 5;
+			//c->nextresend = time(NULL) + 5;
 		}
 	}
 }
