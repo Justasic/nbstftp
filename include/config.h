@@ -30,6 +30,7 @@ typedef struct config_s
 	char *group;
 	char *pidfile;
 	char daemonize;
+	char fixpath;
 	int readtimeout;
 	listen_vec_t listenblocks;
 } config_t;

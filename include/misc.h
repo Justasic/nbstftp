@@ -33,3 +33,4 @@ extern void Daemonize(void);
 extern int vasprintf(char **str, const char *fmt, va_list args);
 extern int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions);
 extern char *SizeReduce(size_t size);
+extern void FixPath(char *str);

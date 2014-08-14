@@ -58,8 +58,14 @@ The group is similar to the user option above but does the same to the group. Th
 .BR \fBpidfile\fR " \- "(string " \- "optional)
 The PID file is a file used for the process id, this is usually somewhere in /var/run and it is used to restart or stop the server. The default location is '/var/run/nbstftp.pid'.
 .TP
+.BR \fBdaemonize\fR " \- "(boolean " \- "optional)
+Specify whether to daemonize to the background when launched.
+.TP
 .BR \fBreadtimeout\fR " \- "(number " \- "optional)
 The readtimeout value is used by the multiplexer (epoll/poll/select) to specify the amount of time (in seconds) before the multiplexer times out and lets the process run events. This means that the higher the number the slower the application is to respond to events (such as when a ping timeout needs to happen). This does not affect how fast the server receives or processes packets (it's mostly used for timers). Default timeout time is 5 seconds.
+.TP
+.BR \fBfixpath\fR " \- "(boolean " \- "optional)
+Fixes the path separators used by the windows netboot environment which is required to natively netboot windows. Paths such as \\boot\\pxeboot.n12 convert to /boot/pxeboot.n12 on unix systems.
 .TP
 .SH `listen' block
 The listen block defines which addresses to bind to and what ports to listen on. The default config file binds to all interfaces and accept from all addresses and any UDP packets on port 69. You may limit this or listen on more ports.

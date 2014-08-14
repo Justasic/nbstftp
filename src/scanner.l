@@ -18,6 +18,7 @@ server        { return SERVER; }
 bind          { return BIND; }
 port          { return PORT; }
 directory     { return DIRECTORY; }
+fixpath       { return FIXPATH; }
 user          { return USER; }
 group         { return GROUP; }
 pidfile       { return PIDFILE; }

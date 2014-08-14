@@ -290,3 +290,16 @@ char *SizeReduce(size_t size)
 	asprintf(&str, "%zu %s", size, sizes[sz]);
 	return str;
 }
+
+// This is used to convert Windows-style path strings to linux/unix.
+// Windows supports unix-like paths but Linux does not support Windows-like
+// path strings. So netbooting windows (which requires windows-style path strings)
+// fails because Linux returns File Not Found when accessing the file path.
+void FixPath(char *str)
+{
+	while (*str)
+	{
+		if (*str == '\\')
+			*str = '/';
+	}
+}

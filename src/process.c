@@ -174,6 +174,9 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			}
 
 			int imode = strcasecmp(mode, "netascii");
+			
+			if (config->fixpath)
+				FixPath(filename);
 
 			char *tmp = NULL;
 			asprintf(&tmp, "%s/%s", config->directory, filename);
@@ -258,6 +261,9 @@ end:
 			}
 
 			int imode = strcasecmp(mode, "netascii");
+			
+			if (config->fixpath)
+				FixPath(filename);
 
 			char *tmp = NULL;
 			asprintf(&tmp, "%s/%s", config->directory, filename);

@@ -32,6 +32,13 @@ server
 	// seconds. The lower the seconds, the faster the program will respond to
 	// events but the more CPU it will use. (default is 5 seconds).
 	readtimeout = 5;
+	
+	// Set this to true if you are attempting to netboot windows.
+	// This converts the windows-style path separators to unix-style.
+	// Traditional unix-style path separators work fine so the option
+	// can be left on with no affect to any linux netboot systems.
+	// Default value: true
+	fixpath = true;
 }
 
 // IPV4 Listen block, you can add as many as you need.

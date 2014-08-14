@@ -36,6 +36,7 @@ listen_t *curblock;
 %token DAEMONIZE
 %token READTIMEOUT
 %token LISTEN
+%token FIXPATH
 
 
 %%
@@ -57,6 +58,7 @@ listen_entry: LISTEN
 		config = nmalloc(sizeof(config_t));
 		config->daemonize = -1;
 		config->readtimeout = 5;
+		config->fixpath = 1;
 		vec_init(&config->listenblocks);
 	}
 	
@@ -75,7 +77,7 @@ server_entry: SERVER
 '{' server_items '}';
 
 server_items: | server_item server_items;
-server_item: server_directory | server_user | server_group | server_daemonize | server_pidfile | server_readtimeout;
+server_item: server_directory | server_user | server_group | server_daemonize | server_pidfile | server_readtimeout | server_fixpath;
 
 listen_items: | listen_item listen_items;
 listen_item: listen_bind | listen_port;
@@ -144,4 +146,9 @@ server_pidfile: PIDFILE '=' STR ';'
 server_readtimeout: READTIMEOUT '=' CINT ';'
 {
 	config->readtimeout = yylval.ival;
+};
+
+server_fixpath: FIXPATH '=' BOOL ';'
+{
+	config->fixpath = yylval.bval;
 };
