@@ -23,9 +23,8 @@
 #include "signalhandler.h"
 #include "socket.h"
 #include "sysconf.h"
+#include "module.h"
 //#include "packets.h"
-
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 int running = 1;
 // Fork to background unless otherwise specified
@@ -100,6 +99,9 @@ int main(int argc, char **argv)
 	// Initialize the client pool
 	vec_init(&clientpool);
 	
+	// Initialize our modules
+	InitializeModules();
+	
 	// Initialize the socket system.
 	if (InitializeSockets() == -1)
 		die("Failed to initialize and bind to the interfaces!");
@@ -125,6 +127,9 @@ int main(int argc, char **argv)
 		
 		// Process packets or wait on the sockets.
 		ProcessSockets();
+		
+		// Tick modules
+		CallEvent(EV_TICK, NULL);
 	}
 
 cleanup:

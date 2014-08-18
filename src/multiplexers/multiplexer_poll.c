@@ -33,6 +33,7 @@
 #include "config.h"
 #include "client.h"
 #include "process.h"
+#include "module.h"
 
 #ifndef _WIN32
 # include <unistd.h>
@@ -105,7 +106,7 @@ int ShutdownMultiplexer(void)
 
 void ProcessSockets(void)
 {
-	printf("Entering poll\n");
+	dprintf("Entering poll\n");
 	
 	int total = poll(&vec_first(&events), events.length, config->readtimeout * 1000);
 	
@@ -128,7 +129,7 @@ void ProcessSockets(void)
 		socket_t s;
 		if (FindSocket(ev->fd, &s) == -1)
 		{
-			fprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->fd);
+			dfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->fd);
 			// We don't know what socket this is. Someone added something
 			// stupid somewhere so shut this shit down now.
 			// We have to create a temporary socket_t object to remove it
@@ -139,22 +140,25 @@ void ProcessSockets(void)
 			continue;
 		}
 		
+		// Call our event.
+		CallEvent(EV_SOCKETACTIVITY, &s);
+		
 		if (ev->revents & (POLLERR | POLLRDHUP))
 		{
-			printf("Epoll error reading socket %d, destroying.\n", s.fd);
+			dprintf("Epoll error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
 		
 		if (ev->revents & POLLIN && ReceivePackets(s) == -1)
 		{
-			printf("Destorying socket due to receive failure!\n");
+			dprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
 		
 		if (ev->revents & POLLOUT && SendPackets(s) == -1)
 		{
-			printf("Destorying socket due to send failure!\n");
+			dprintf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

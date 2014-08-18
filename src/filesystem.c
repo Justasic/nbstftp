@@ -17,6 +17,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <assert.h>
+#include <string.h>
+#include <errno.h>
+#include <pwd.h>    // For /etc/passwd related functions
+#include <grp.h>    // For /etc/group related functions
 
 int FileExists(const char *file)
 {
@@ -54,4 +59,76 @@ int IsDirectory(const char *dir)
 	}
 	
 	return 0;
+}
+
+int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions)
+{
+	assert(file);
+	
+	if (!user && !group)
+		return 0;
+	
+	uid_t uid = 0;
+	gid_t gid = 0;
+	
+	if (user)
+	{
+		errno = 0;
+		struct passwd *pass = getpwnam(user);
+		if (!pass)
+		{
+			fprintf(stderr, "Cannot getpwnam %s: %s\n", user, strerror(errno));
+			return 1;
+		}
+		uid = pass->pw_uid;
+		
+		// Save on one syscall at least.
+		if (group && !strcmp(user, group))
+		{
+			gid = pass->pw_gid;
+			goto perms;
+		}
+	}
+	
+	if (group)
+	{
+		errno = 0;
+		struct group *grp = getgrnam(group);
+		if (!grp)
+		{
+			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
+			return 1;
+		}
+		
+		gid = grp->gr_gid;
+	}
+	
+perms:
+	if (chown(file, uid, gid) == -1)
+	{
+		fprintf(stderr, "Failed to set owner on file %s to %s %s: %s\n", file, user, group, strerror(errno));
+		return 1;
+	}
+	
+	if (chmod(file, permissions) == -1)
+	{
+		fprintf(stderr, "Failed to set permissions on file %s to %.4d\n", file, permissions);
+		return 1;
+	}
+	
+	return 0;
+}
+
+// This is used to convert Windows-style path strings to linux/unix.
+// Windows supports unix-like paths but Linux does not support Windows-like
+// path strings. So netbooting windows (which requires windows-style path strings)
+// fails because Linux returns File Not Found when accessing the file path.
+void FixPath(char *str)
+{
+	size_t len = strlen(str);
+	while (len--)
+	{
+		if (str[len] == '\\')
+			str[len] = '/';
+	}
 }

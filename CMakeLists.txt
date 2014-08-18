@@ -180,6 +180,9 @@ FLEX_TARGET(LEXER ${CMAKE_SOURCE_DIR}/src/scanner.l ${CMAKE_BINARY_DIR}/lexer.c)
 BISON_TARGET(PARSER ${CMAKE_SOURCE_DIR}/src/parser.y ${CMAKE_BINARY_DIR}/parser.c)
 ADD_FLEX_BISON_DEPENDENCY(LEXER PARSER)
 
+# Make sure if the platform we're on requires libdl that we use it.
+find_library(LIBDL dl)
+
 # Add our include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -207,7 +210,9 @@ find_program(GZIP gzip)
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${FLEX_LEXER_OUTPUTS} ${BISON_PARSER_OUTPUTS})
 set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE C COMPILE_FLAGS "${CFLAGS}")
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C PREFIX "" SUFFIX "" LINK_FLAGS "${LINKFLAGS}")
-
+if (LIBDL)
+	target_link_libraries(${PROJECT_NAME} dl)
+endif (LIBDL)
 add_dependencies(${PROJECT_NAME} license_headers)
 
 # Do the make install

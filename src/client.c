@@ -18,6 +18,7 @@ typedef struct client_s client_t;
 #include "socket.h"
 #include "vec.h"
 #include "misc.h"
+#include "module.h"
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
@@ -107,39 +108,6 @@ int CompareClients(client_t *c1, client_t *c2)
 	assert(c2);
 
 	return c1->tid == c2->tid;
-
-#if 0
-
-	assert(c1->s.addr.sa.sa_family == AF_INET ||
-		c1->s.addr.sa.sa_family == AF_INET6);
-	assert(c2->s.addr.sa.sa_family == AF_INET ||
-		c2->s.addr.sa.sa_family == AF_INET6);
-
-	socket_t s1 = c1->s, s2 = c2->s;
-
-        // First, compare address types, if they're not a match then
-        // obviously the clients are very different.
-	if (s1.addr.sa.sa_family != s2.addr.sa.sa_family)
-                return 0;
-
-        // Now compare the addresses. IPv4 first
-	if (s1.addr.sa.sa_family == AF_INET)
-        {
-		return memcmp(&(s1.addr.in.sin_addr),
-			      &(s2.addr.in.sin_addr),
-                              sizeof(struct in_addr)) == 0;
-        }
-        else
-        {
-		return memcmp(&(s1.addr.in6.sin6_addr),
-			      &(s2.addr.in6.sin6_addr),
-			      sizeof(struct in6_addr)) == 0;
-        }
-
-        // (should) never be reached but compilers whine about this not
-        // being here so here it is.
-        return 0;
-#endif
 }
 
 client_t *FindClient(socket_t s)
@@ -190,8 +158,11 @@ void CheckClients(void)
 				RemoveClient(c);
 				continue;
 			}
+			
+			struct { client_t *c; const packet_t *p; size_t len; } ev = { c, c->lastpacket.p, c->lastpacket.len };
+			CallEvent(EV_RESEND, &ev);
 
-			printf("Resending last packet\n");
+			dprintf("Resending last packet, retry %d/3\n", c->waiting);
 			// Resend the packet
 			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);
 			//c->nextresend = time(NULL) + 5;

@@ -20,6 +20,14 @@
 
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
+#ifndef NDEBUG
+# define dprintf(str, ...) printf(str, __VA_ARGS__)
+# define dfprintf(thing, str, ...) fprintf(thing, str, __VA_ARGS__)
+#else
+# define dprintf(str, ...)
+# define dfprintf(thing, str, ...)
+#endif
+
 extern int running;
 
 // Allocators
@@ -31,6 +39,6 @@ extern void die(const char *, ...) __attribute__ ((noreturn));
 extern int SwitchUserAndGroup(const char *user, const char *group);
 extern void Daemonize(void);
 extern int vasprintf(char **str, const char *fmt, va_list args);
-extern int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions);
 extern char *SizeReduce(size_t size);
-extern void FixPath(char *str);
+extern char *GetBlockSize(size_t blocks);
+extern char *stringify(const char *str, ...);

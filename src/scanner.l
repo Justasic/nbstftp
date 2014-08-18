@@ -25,6 +25,10 @@ pidfile       { return PIDFILE; }
 daemonize     { return DAEMONIZE; }
 readtimeout   { return READTIMEOUT; }
 listen        { return LISTEN; }
+module        { return MODULE; }
+name          { return NAME; }
+path          { return PATH; }
+modulesearchpath { return MODSEARCHPATH; }
 
  /* Ignore white space */
 [ \t]                 { }

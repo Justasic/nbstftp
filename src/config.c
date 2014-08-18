@@ -100,13 +100,25 @@ void DeallocateConfig(config_t *conf)
 	int i = 0;
 	vec_foreach(&config->listenblocks, block, i)
 	{
-        if (block->bindaddr)
-    		free(block->bindaddr);
+		if (block->bindaddr)
+			free(block->bindaddr);
 
 		free(block);
 	}
 	
 	vec_deinit(&config->listenblocks);
+	
+	conf_module_t *m;
+	vec_foreach(&config->moduleblocks, m, i)
+	{
+		if (m->name)
+			free(m->name);
+		
+		if (m->path)
+			free(m->path);
+	}
+	
+	vec_deinit(&config->moduleblocks);
 
 	if (conf->user)
 		free(conf->user);

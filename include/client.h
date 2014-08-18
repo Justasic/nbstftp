@@ -34,6 +34,7 @@ typedef struct client_s
 	socket_t s;
         // Status variables
 	uint16_t currentblockno;
+	size_t actualblockno;
         uint8_t waiting, sendingfile, destroy;
 	time_t nextresend;
 

@@ -24,6 +24,7 @@
 #include "client.h"
 #include "process.h"
 #include "vec.h"
+#include "module.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -142,7 +143,7 @@ void ProcessSockets(void)
 	if (socketpool.length > events.capacity)
 		vec_reserve(&events, socketpool.length * 2);
 	
-	printf("Entering kevent\n");
+	dprintf("Entering kevent\n");
 	
 	int total = kevent(KqueueHandle, &vec_first(&changed), changed.length, &vec_first(&events), events.capacity, &kqtime);
 	
@@ -166,7 +167,7 @@ void ProcessSockets(void)
 		socket_t s;
 		if (FindSocket(ev->ident, &s) == -1)
 		{
-			fprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->ident);
+			dfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->ident);
 			// We don't know what socket this is. Someone added something
 			// stupid somewhere so shut this shit down now.
 			// We have to create a temporary socket_t object to remove it
@@ -177,9 +178,12 @@ void ProcessSockets(void)
 			continue;
 		}
 		
+		// Call our event.
+		CallEvent(EV_SOCKETACTIVITY, &s);
+		
 		if (ev->flags & EV_EOF)
 		{
-			printf("Kqueue error reading socket %d, destroying.\n", s.fd);
+			dprintf("Kqueue error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
@@ -187,14 +191,14 @@ void ProcessSockets(void)
 		// process socket read events.
 		if (ev->filter & EVFILT_READ && ReceivePackets(s) == -1)
 		{
-			printf("Destorying socket due to receive failure!\n");
+			dprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
 		
 		// Process socket write events
 		if (ev->filter & EVFILT_WRITE && SendPackets(s) == -1)
 		{
-			printf("Destorying socket due to send failure!\n");
+			dprintf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

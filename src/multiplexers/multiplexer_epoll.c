@@ -24,6 +24,7 @@
 #include "client.h"
 #include "process.h"
 #include "vec.h"
+#include "module.h"
 
 #include <sys/epoll.h>
 #include <sys/types.h>
@@ -122,11 +123,11 @@ void ProcessSockets(void)
 {
 	if (socketpool.length >= events.capacity)
 	{
-		printf("Reserving more space for events\n");
+		dprintf("Reserving more space for events\n");
 		vec_reserve(&events, socketpool.length * 2);
 	}
 	
-	printf("Entering epoll_wait\n");
+	dprintf("Entering epoll_wait\n");
 	
 	int total = epoll_wait(EpollHandle, &vec_first(&events), events.capacity, config->readtimeout * 1000);
 	
@@ -144,7 +145,7 @@ void ProcessSockets(void)
 		socket_t s;
 		if (FindSocket(ev->data.fd, &s) == -1)
 		{
-			fprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->data.fd);
+			dfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->data.fd);
 			// We don't know what socket this is. Someone added something
 			// stupid somewhere so shut this shit down now.
 			// We have to create a temporary socket_t object to remove it
@@ -155,9 +156,12 @@ void ProcessSockets(void)
 			continue;
 		}
 		
+		// Call our event.
+		CallEvent(EV_SOCKETACTIVITY, &s);
+		
 		if (ev->events & (EPOLLHUP | EPOLLERR))
 		{
-			printf("Epoll error reading socket %d, destroying.\n", s.fd);
+			dprintf("Epoll error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
@@ -165,14 +169,14 @@ void ProcessSockets(void)
 		// process socket read events.
 		if (ev->events & EPOLLIN && ReceivePackets(s) == -1)
 		{
-			printf("Destorying socket due to receive failure!\n");
+			dprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
 		
 		// Process socket write events
 		if (ev->events & EPOLLOUT && SendPackets(s) == -1)
 		{
-			printf("Destorying socket due to send failure!\n");
+			dprintf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

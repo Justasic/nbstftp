@@ -17,6 +17,7 @@
 #include "config.h"
 #include "socket.h"
 #include "filesystem.h"
+#include "module.h"
 #include <assert.h>
 #include <errno.h>
 #include "sysconf.h"
@@ -45,6 +46,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 	switch(ntohs(p->opcode))
 	{
 		case PACKET_DATA:
+		{
 			c->waiting = 0;
 			if (c->lastpacket.allocated == 2)
 			{
@@ -52,19 +54,25 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
 
-			printf("Got a data packet\n");
-			if ((len > MAX_PACKET_SIZE))
-			{
-				fprintf(stderr, "Received an oversized data packet! Terminating transfer.\n");
-				Error(c, ERROR_ILLEGAL, "Sent an oversized packet.");
-			}
+			dprintf("Got a data packet\n");
+			
+			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			CallEvent(EV_DATA_PACKET, &ev);
 
 			// If we're sending a file then write the next block
 			// otherwise, just ignore it because it's not ours.
 			if (c->sendingfile)
 			{
+				c->currentblockno++;
+				c->actualblockno++;
+				
 				size_t flen = fwrite(((uint8_t*)p) + sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
-				printf("Wrote block %d of length %zu\n", ntohs(p->blockno), flen);
+				
+				char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
+				printf("Wrote block %d%s of length %zu (%s transferred)\r",
+				       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
+				       flen, GetBlockSize(c->actualblockno));
+				free(tmp2);
 
 				Acknowledge(c, ntohs(p->blockno));
 
@@ -76,6 +84,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				}
 			}
 			break;
+		}
 		case PACKET_ERROR:
 		{
 			c->waiting = 0;
@@ -91,6 +100,10 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 #else
 			char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
 #endif
+			
+			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			CallEvent(EV_ERROR_PACKET, &ev);
+			
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 
 			// Send an Acknowledgement packet.
@@ -123,8 +136,15 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				free(c->lastpacket.p);
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
-
-			printf("Got Acknowledgement packet for block %d from %s\n", ntohs(p->blockno), GetAddress(c->s.addr));
+			
+			char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
+			printf("Got Acknowledgement packet for block %d%s from %s (%s transferred)\r",
+			       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
+			       GetAddress(c->s.addr), GetBlockSize(c->actualblockno));
+			free(tmp2);
+			
+			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			CallEvent(EV_ACK_PACKET, &ev);
 
 			if (c->sendingfile)
 			{
@@ -133,6 +153,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				size_t readlen = fread(buf, 1, sizeof(buf), c->f);
 
 				c->currentblockno++;
+				c->actualblockno++;
 
 				// Sending a file
 				SendData(c, buf, readlen);
@@ -188,7 +209,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				break;
 			}
 			
-			printf("Checking we can open file \"%s\"\n", tmp);
+			dprintf("Checking we can open file \"%s\"\n", tmp);
 			
 			// Check that we have access to that file
 			if (access(tmp, W_OK) == -1 || access(config->directory, W_OK) == -1)
@@ -200,7 +221,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				}
 			}
 
-			printf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
+			dprintf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
 			FILE *f = fopen(tmp, imode == 0 ? "wt" : "wb");
 			if (!f)
 			{
@@ -208,11 +229,16 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				goto end;
 			}
 
-			printf("File %s is available for write, writing first packet...\n", tmp);
+			dprintf("File %s is available for write, writing first packet...\n", tmp);
 
 			c->f = f;
 			c->currentblockno = 1;
+			c->actualblockno = 1;
 			c->sendingfile = 1;
+			
+			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
+				ev = { p, c, filename, mode, tmp };
+			CallEvent(EV_NEWWRITEREQUEST, &ev);
 
 			// Acknowledge our transfer request
 			Acknowledge(c, 0);
@@ -283,9 +309,7 @@ end:
 			size_t len = ftell(f);
 			rewind(f);
 
-			char *tmp2 = SizeReduce(len);
-			printf("File \"%s\" is %s long, sending first packet\n", tmp, tmp2);
-			free(tmp2);
+			dprintf("File \"%s\" is %s long, sending first packet\n", tmp, SizeReduce(len));
 
 			// file buffer
 			uint8_t buf[512];
@@ -293,7 +317,13 @@ end:
 			size_t readlen = fread(buf, 1, sizeof(buf), f);
 			c->f = f;
 			c->currentblockno = 1;
+			c->actualblockno = 1;
 			c->sendingfile = 1;
+			
+			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
+				ev = { p, c, filename, mode, tmp };
+			CallEvent(EV_NEWWRITEREQUEST, &ev);
+			
 			SendData(c, buf, readlen);
 
 #ifndef HAVE_STRNDUPA
@@ -305,7 +335,11 @@ end:
 			break;
                 }
 		default:
-			printf("Got unknown packet: %d\n", ntohs(p->opcode));
+			dprintf("Got unknown packet: %d\n", ntohs(p->opcode));
+			
+			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			CallEvent(EV_UNKNOWN_PACKET, &ev);
+			
 			break;
 	}
 }

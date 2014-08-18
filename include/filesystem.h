@@ -13,6 +13,9 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #pragma once
+#include <sys/stat.h>
 
 extern int FileExists(const char *file);
 extern int IsDirectory(const char *file);
+extern void FixPath(char *str);
+extern int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions);

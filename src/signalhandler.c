@@ -15,6 +15,7 @@
 
 #include "signalhandler.h"
 #include "config.h"
+#include "module.h"
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -63,6 +64,9 @@ static void SignalHandler(int sig)
 			printf("Received unknown signal %d\n", sig);
 			break;
 	}
+	
+	// Inform our modules about it.
+	CallEvent(EV_SIGNAL, &sig);
 }
 
 void RegisterSignalHandlers(void)

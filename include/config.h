@@ -21,7 +21,11 @@ typedef struct listen_s
 	short port;
 } listen_t;
 
-typedef vec_t(listen_t*) listen_vec_t;
+typedef struct conf_module_s
+{
+	char *name;
+	char *path;
+} conf_module_t;
 
 typedef struct config_s
 {
@@ -29,13 +33,13 @@ typedef struct config_s
 	char *user;
 	char *group;
 	char *pidfile;
+	char *modsearchpath;
 	char daemonize;
 	char fixpath;
 	int readtimeout;
-	listen_vec_t listenblocks;
+	vec_t(listen_t*) listenblocks;
+	vec_t(conf_module_t*) moduleblocks;
 } config_t;
-
-
 
 // Defined in parser.y
 extern config_t *config;

@@ -177,64 +177,6 @@ int SwitchUserAndGroup(const char *user, const char *group)
 	return 0;
 }
 
-int SetFilePermissions(const char *file, const char *user, const char *group, mode_t permissions)
-{
-	assert(file);
-
-	if (!user && !group)
-		return 0;
-
-	uid_t uid = 0;
-	gid_t gid = 0;
-
-	if (user)
-	{
-		errno = 0;
-		struct passwd *pass = getpwnam(user);
-		if (!pass)
-		{
-			fprintf(stderr, "Cannot getpwnam %s: %s\n", user, strerror(errno));
-			return 1;
-		}
-		uid = pass->pw_uid;
-
-		// Save on one syscall at least.
-		if (group && !strcmp(user, group))
-		{
-			gid = pass->pw_gid;
-			goto perms;
-		}
-	}
-
-	if (group)
-	{
-		errno = 0;
-		struct group *grp = getgrnam(group);
-		if (!grp)
-		{
-			fprintf(stderr, "Cannot getgrnam %s: %s\n", group, strerror(errno));
-			return 1;
-		}
-
-		gid = grp->gr_gid;
-	}
-
-perms:
-	if (chown(file, uid, gid) == -1)
-	{
-		fprintf(stderr, "Failed to set owner on file %s to %s %s: %s\n", file, user, group, strerror(errno));
-		return 1;
-	}
-
-	if (chmod(file, permissions) == -1)
-	{
-		fprintf(stderr, "Failed to set permissions on file %s to %.4d\n", file, permissions);
-		return 1;
-	}
-
-	return 0;
-}
-
 int InTerm(void)
 {
 	return isatty(fileno(stdout) && isatty(fileno(stdin)) && isatty(fileno(stderr)));
@@ -270,7 +212,7 @@ void Daemonize(void)
 
 char *SizeReduce(size_t size)
 {
-	static char *sizes[] = {
+	static const char *sizes[] = {
 		"B",
 		"KB",
 		"MB",
@@ -283,23 +225,27 @@ char *SizeReduce(size_t size)
 	};
 
 	int sz = 0;
-	for (sz = 0; size > 1024; size >>= 1, sz++)
+	for (sz = 0; size > 1024; size >>= 10, sz++)
 		;
 
-	char *str = NULL;
-	asprintf(&str, "%zu %s", size, sizes[sz]);
+	// Small string buffer to allow stuff.
+	// Max size should be "1023 (Hello Future!)" (aka, 21 chars + null terminator)
+	static char str[25];
+	sprintf(str, "%zu %s", size, sz >= (sizeof(sizes) / sizeof(*sizes)) ? "(Hello Future!)" : sizes[sz]);
 	return str;
 }
 
-// This is used to convert Windows-style path strings to linux/unix.
-// Windows supports unix-like paths but Linux does not support Windows-like
-// path strings. So netbooting windows (which requires windows-style path strings)
-// fails because Linux returns File Not Found when accessing the file path.
-void FixPath(char *str)
+char *GetBlockSize(size_t blocks)
 {
-	while (*str)
-	{
-		if (*str == '\\')
-			*str = '/';
-	}
+	return SizeReduce(blocks * 512);
+}
+
+char *stringify(const char *str, ...)
+{
+	char *ret = NULL;
+	va_list ap;
+	va_start(ap, str);
+	vasprintf(&ret, str, ap);
+	va_end(ap);
+	return ret;
 }

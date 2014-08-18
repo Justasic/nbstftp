@@ -1,6 +1,7 @@
 %{
 #include "config.h"
 #include "misc.h"
+#include "module.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +12,7 @@ extern void yyerror(const char *s);
 
 config_t *config;
 listen_t *curblock;
+conf_module_t *curmod;
 %}
 
 %error-verbose
@@ -37,13 +39,37 @@ listen_t *curblock;
 %token READTIMEOUT
 %token LISTEN
 %token FIXPATH
-
+%token MODULE
+%token NAME
+%token PATH
+%token MODSEARCHPATH
 
 %%
 
 conf: | conf conf_items;
 
-conf_items: server_entry | listen_entry;
+conf_items: server_entry | listen_entry | module_entry;
+
+module_entry: MODULE
+{
+	conf_module_t *m = nmalloc(sizeof(conf_module_t));
+	m->path = NULL;
+	m->name = NULL;
+	curmod = m;
+	
+	if (!config)
+	{
+		config = nmalloc(sizeof(config_t));
+		config->daemonize = -1;
+		config->readtimeout = 5;
+		config->fixpath = 1;
+		vec_init(&config->listenblocks);
+		vec_init(&config->moduleblocks);
+	}
+	
+	vec_push(&config->moduleblocks, m);
+}
+'{' module_items '}';
 
 listen_entry: LISTEN
 {
@@ -60,6 +86,7 @@ listen_entry: LISTEN
 		config->readtimeout = 5;
 		config->fixpath = 1;
 		vec_init(&config->listenblocks);
+		vec_init(&config->moduleblocks);
 	}
 	
 	vec_push(&config->listenblocks, block);
@@ -72,15 +99,31 @@ server_entry: SERVER
 	// Defaults
 	config->daemonize = 1;
 	config->readtimeout = 5;
+	config->fixpath = 1;
 	vec_init(&config->listenblocks);
+	vec_init(&config->moduleblocks);
 }
 '{' server_items '}';
 
 server_items: | server_item server_items;
-server_item: server_directory | server_user | server_group | server_daemonize | server_pidfile | server_readtimeout | server_fixpath;
+server_item: server_directory | server_user | server_group | server_daemonize | server_pidfile | server_readtimeout | server_fixpath
+| server_module_search_path;
 
 listen_items: | listen_item listen_items;
 listen_item: listen_bind | listen_port;
+
+module_items: | module_item module_items;
+module_item: module_path | module_name;
+
+module_path: PATH '=' STR ';'
+{
+	curmod->path = strdup(yylval.sval);
+};
+
+module_name: NAME '=' STR ';'
+{
+	curmod->name = strdup(yylval.sval);
+};
 
 listen_bind: BIND '=' STR ';'
 {
@@ -127,6 +170,10 @@ server_group: GROUP '=' STR ';'
 	}
 };
 
+server_module_search_path: MODSEARCHPATH '=' STR ';'
+{
+	config->modsearchpath = strdup(yylval.sval);
+};
 
 server_daemonize: DAEMONIZE '=' BOOL ';'
 {
