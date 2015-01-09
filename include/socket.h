@@ -28,11 +28,20 @@ extern void ShutdownSockets(void);
 
 typedef struct socket_s
 {
+	// The file descriptor
 	int fd;
+	// is it binding or temporary?
 	int type;
+	// Multiplexer flags
 	uint32_t flags;
+	// The actual binding information on the fd
 	socketstructs_t addr;
+	// our bind address (eg, 127.0.0.1)
 	char *bindaddr;
+	// A packet static packet buffer allocated on socket creation.
+	packet_t *packet;
+	// The length of the above memory block
+	size_t pktlen;
 } socket_t;
 
 typedef vec_t(socket_t) socket_vec_t;

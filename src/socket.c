@@ -113,6 +113,12 @@ int AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t
 	sock.flags = 0;
 	memcpy(&(sock.addr), &saddr, sizeof(socketstructs_t));
 
+	// Allocate the packet.
+	// According to RFC2348 this is the maximum size allowable.
+	// the + 4 is to include the 4 bytes of the TFTP header.
+	sock.pktlen = 65464 + 4;
+	sock.packet = malloc(sock.pktlen);
+
 	// Add it to the multiplexer
 	if (binding)
 	{
@@ -195,6 +201,7 @@ void DestroySocket(socket_t s, uint8_t closefd)
 		close(s.fd);
 	// Free a string then free itself.
 	free(s.bindaddr);
+	free(s.packet);
 }
 
 // Initialize the Epoll socket descriptor as well as all the
@@ -305,7 +312,7 @@ int SendPackets(socket_t s)
 		vec_foreach(&c->packetqueue_vec, pq, idx)
 		{
 			bprintf("Sending packet %d length %zu\n", ntohs(pq.p->opcode), pq.len);
-			
+
 			struct { socket_t *s; packet_t *p; client_t *c; size_t len; } ev = { &c->s, pq.p, c, pq.len };
 			CallEvent(EV_SENDING_PACKETS, &ev);
 
@@ -315,6 +322,7 @@ int SendPackets(socket_t s)
 				perror("sendto failed");
 				return -1;
 			}
+			c->bytestransferred += sendlen;
 
 			if (pq.allocated && pq.allocated != 2)
 				free(pq.p);
@@ -344,10 +352,14 @@ int ReceivePackets(socket_t s)
 {
 	socketstructs_t ss;
 	socklen_t addrlen = sizeof(ss);
-	uint8_t buf[MAX_PACKET_SIZE];
+// 	uint8_t buf[MAX_PACKET_SIZE];
 	errno = 0;
-	memset(buf, 0, sizeof(buf));
-	size_t recvlen = recvfrom(s.fd, buf, MAX_PACKET_SIZE, 0, &ss.sa, &addrlen);
+	// Clear out the old packet, since we're a synchronous process, we don't need
+	// to worry about corrupting data. This memset is still faster than calling
+	// malloc for each packet. We simply empty the memory block and copy the new
+	// packet into it's place and process again.
+	memset(s.packet, 0, s.pktlen);
+	size_t recvlen = recvfrom(s.fd, (void*)s.packet, s.pktlen, 0, &ss.sa, &addrlen);
 
 	// The kernel either told us that we need to read again
 	// or we received a signal and are continuing from where
@@ -368,14 +380,15 @@ int ReceivePackets(socket_t s)
 
 	// Either find the client or allocate a new client and socket
 	client_t *c = FindOrAllocateClient(cs);
+	c->bytestransferred += recvlen;
 
 	bprintf("Received %zu bytes from %s:%d on socket %d\n", recvlen, GetAddress(cs.addr), GetPort(cs), s.fd);
 
-	struct { socket_t *s; client_t *c; void *buf; size_t len; } ev = { &s, c, buf, recvlen };
+	struct { socket_t *s; client_t *c; const void * const buf; size_t len; } ev = { &s, c, s.packet, recvlen };
 	CallEvent(EV_RECEIVING_PACKETS, &ev);
 
 	// Process the packet received.
-	ProcessPacket(c, buf, recvlen);
+	ProcessPacket(c, s.packet, recvlen, s.pktlen);
 
 	return 0;
 }

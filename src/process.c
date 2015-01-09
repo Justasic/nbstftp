@@ -29,8 +29,10 @@
 // The main thing about this file is that every packet received
 // goes here and is handled here.
 
+#define PTR_ADVANCE(ptr, otherptr, max) ptr += strnlen(ptr, max)
+
 // Process the incoming packet.
-void ProcessPacket(client_t *c, void *buffer, size_t len)
+void ProcessPacket(client_t *c, const packet_t * const p, size_t len, size_t alloclen)
 {
 	// Sanity check
 	if (len > MAX_PACKET_SIZE)
@@ -39,9 +41,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 		return;
 	}
 
-	assert(buffer);
-
-	const packet_t *p = buffer;
+	assert(p);
 
 	switch(ntohs(p->opcode))
 	{
@@ -56,7 +56,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 
 			bprintf("Got a data packet\n");
 
-			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			struct { const packet_t * const p; client_t *c; } ev = { p, c };
 			CallEvent(EV_DATA_PACKET, &ev);
 
 			// If we're sending a file then write the next block
@@ -71,14 +71,15 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
 				printf("Wrote block %d%s of length %zu (%s transferred)\r",
 				       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
-				       flen, GetBlockSize(c->actualblockno));
+					   flen, SizeReduce(c->bytestransferred));
 				free(tmp2);
 
 				Acknowledge(c, ntohs(p->blockno));
 
 				if ((len - sizeof(packet_t)) < 512)
 				{
-					printf("Got end of data packet\n");
+					printf("Got end of data packet, %s transferred in %zu blocks\n",
+						   SizeReduce(c->bytestransferred), c->actualblockno);
 					// Notify on the sending of a packet that this needs to be removed.
 					c->destroy = 1;
 				}
@@ -138,12 +139,12 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			}
 
 			char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
-			printf("Got Acknowledgement packet for block %d%s from %s (%s transferred)\r",
+			printf("Got Acknowledgement packet for block %d%s from %s (%s transferred)\n",
 			       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
-			       GetAddress(c->s.addr), GetBlockSize(c->actualblockno));
+				   GetAddress(c->s.addr), SizeReduce(c->bytestransferred));
 			free(tmp2);
 
-			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			struct { const packet_t * const p; client_t *c; } ev = { p, c };
 			CallEvent(EV_ACK_PACKET, &ev);
 
 			if (c->sendingfile)
@@ -161,7 +162,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				// We're at the end of the file.
 				if (MIN(512, readlen) != 512)
 				{
-					printf("Finished sending file\n");
+					printf("Finished sending file, %s transferred in %zu blocks\n",
+						   SizeReduce(c->bytestransferred), c->actualblockno);
 					c->destroy = 1;
 					break;
 				}
@@ -178,14 +180,53 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
 #ifdef HAVE_STRNDUPA
-			char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
-			char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			// Get the filename and modes
+			//
+			// Since we dig only past the first value in the struct, we only
+			// get the size of that first value (eg, the uint16_t)
+			// Use strndupa to use the stack frame for temporary allocation with a
+			// max length of 512 bytes. This will prevent buffer-overflow exploits (or so I hope)
+			size_t maxlen = alloclen - sizeof(uint16_t);
+			// Offset the packet pointer by the size of the TFTP header.
+			const char *data = ((const char *)p) + sizeof(uint16_t);
+			// Get the filename
+			char *filename = strndupa(data, maxlen);
+			// PTR_ADVANCE will advance the pointer by the size of the previous pointer without exceeding maxlen.
+			// the macro is defined at the top of this file and was added simply to make things more readable.
+			PTR_ADVANCE(data, filename, maxlen);
+			// This one is a bit weirder. We get the size of the uint16 like
+			// we did above but also skip our filename string AND the remaining
+			// null byte which strlen does not include.
+			char *mode = strndupa(data + 1, maxlen);
+			PTR_ADVANCE(data, mode, maxlen);
+			// As per RFC2347, RFC2348, and RFC2349 we have an option parameter given
+			// We must copy it to see what the option is, there is an additional option
+			// parameter below.
+			char *opt = strndupa(data + 1, maxlen);
+			PTR_ADVANCE(data, opt, maxlen);
+			// Get the option's parameter (if the option was even specified).
+			char *optparam = NULL;
+			if (strnlen(opt, maxlen) != 0)
+				optparam = strndupa(data + 1, maxlen);
 #else
-			char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
-			char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			size_t maxlen = alloclen - sizeof(uint16_t);
+			const char *data = ((const char *)p) + sizeof(uint16_t);
+
+			char *filename = strndup(data, maxlen);
+			PTR_ADVANCE(data, filename, maxlen);
+
+			char *mode = strndup(data + 1, maxlen);
+			PTR_ADVANCE(data, mode, maxlen);
+
+			char *opt = strndup(data + 1, maxlen);
+			PTR_ADVANCE(data, opt, maxlen);
+
+			char *optparam = NULL;
+			if (strnlen(opt, maxlen) != 0)
+				optparam = strndup(data + 1, maxlen);
 #endif
 
-			printf("Got write request packet for file \"%s\" in mode %s\n", filename, mode);
+			printf("Got write request packet for file \"%s\" in mode %s with option \"%s\" param \"%s\"\n", filename, mode, opt, optparam);
 
 			// We don't support mail-mode
 			if (!strcasecmp(mode, "mail"))
@@ -236,7 +277,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			c->actualblockno = 1;
 			c->sendingfile = 1;
 
-			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
+			struct { const packet_t * const p; client_t *c; char *filename, *mode, *path; }
 				ev = { p, c, filename, mode, tmp };
 			CallEvent(EV_NEWWRITEREQUEST, &ev);
 
@@ -247,6 +288,8 @@ end:
 #ifndef HAVE_STRNDUPA
 			free(filename);
 			free(mode);
+			free(opt);
+			free(optparam);
 #endif
 			free(tmp);
 			break;
@@ -266,18 +309,48 @@ end:
 			// get the size of that first value (eg, the uint16_t)
 			// Use strndupa to use the stack frame for temporary allocation with a
 			// max length of 512 bytes. This will prevent buffer-overflow exploits (or so I hope)
-			char *filename = strndupa(((const char *)p) + sizeof(uint16_t), 512);
+			size_t maxlen = alloclen - sizeof(uint16_t);
+			// Offset the packet pointer by the size of the TFTP header.
+			const char *data = ((const char *)p) + sizeof(uint16_t);
+			// Get the filename
+			char *filename = strndupa(data, maxlen);
+			// PTR_ADVANCE will advance the pointer by the size of the previous pointer without exceeding maxlen.
+			// the macro is defined at the top of this file and was added simply to make things more readable.
+			PTR_ADVANCE(data, filename, maxlen);
 			// This one is a bit weirder. We get the size of the uint16 like
 			// we did above but also skip our filename string AND the remaining
 			// null byte which strlen does not include.
-			char *mode = strndupa(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			char *mode = strndupa(data + 1, maxlen);
+			PTR_ADVANCE(data, mode, maxlen);
+			// As per RFC2347, RFC2348, and RFC2349 we have an option parameter given
+			// We must copy it to see what the option is, there is an additional option
+			// parameter below.
+			char *opt = strndupa(data + 1, maxlen);
+			PTR_ADVANCE(data, opt, maxlen);
+			// Get the option's parameter (if the option was even specified).
+			char *optparam = NULL;
+			if (strnlen(opt, maxlen) != 0)
+				optparam = strndupa(data + 1, maxlen);
 #else
-			char *filename = strndup(((const char *)p) + sizeof(uint16_t), 512);
-			char *mode = strndup(((const char *)p) + (sizeof(uint16_t) + strnlen(filename, 512) + 1), 512);
+			size_t maxlen = alloclen - sizeof(uint16_t);
+			const char *data = ((const char *)p) + sizeof(uint16_t);
+
+			char *filename = strndup(data, maxlen);
+			PTR_ADVANCE(data, filename, maxlen);
+
+			char *mode = strndup(data + 1, maxlen);
+			PTR_ADVANCE(data, mode, maxlen);
+
+			char *opt = strndup(data + 1, maxlen);
+			PTR_ADVANCE(data, opt, maxlen);
+
+			char *optparam = NULL;
+			if (strnlen(opt, maxlen) != 0)
+				optparam = strndup(data + 1, maxlen);
 #endif
 
 			// mode can be "netascii", "octet", or "mail" case insensitive.
-			printf("Got read request packet: \"%s\" -> \"%s\"\n", filename, mode);
+			printf("Got read request packet: \"%s\" -> \"%s\" with option \"%s\"\n", filename, mode, opt);
 
 			// We don't support mail-mode
 			if (!strcasecmp(mode, "mail"))
@@ -320,7 +393,7 @@ end:
 			c->actualblockno = 1;
 			c->sendingfile = 1;
 
-			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
+			struct { const packet_t * const p; client_t *c; char *filename, *mode, *path; }
 				ev = { p, c, filename, mode, tmp };
 			CallEvent(EV_NEWWRITEREQUEST, &ev);
 
@@ -329,15 +402,26 @@ end:
 #ifndef HAVE_STRNDUPA
 			free(filename);
 			free(mode);
+			free(opt);
+			free(optparam);
 #endif
 			free(tmp);
 
 			break;
-                }
+		}
+		case PACKET_OACK:
+		{
+			c->waiting = 0;
+			if (c->lastpacket.allocated == 2)
+			{
+				free(c->lastpacket.p);
+				c->lastpacket.allocated = c->lastpacket.len = 0;
+			}
+		}
 		default:
 			bprintf("Got unknown packet: %d\n", ntohs(p->opcode));
 
-			struct { const packet_t *p; client_t *c; } ev = { p, c };
+			struct { const packet_t * const p; client_t *c; } ev = { p, c };
 			CallEvent(EV_UNKNOWN_PACKET, &ev);
 
 			break;

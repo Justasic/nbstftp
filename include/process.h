@@ -17,4 +17,4 @@
 #include <stddef.h>
 #include "client.h"
 
-extern void ProcessPacket(client_t *c, void *buffer, size_t len);
+extern void ProcessPacket(client_t *c, const packet_t * const buffer, size_t len, size_t alloclen);

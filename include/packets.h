@@ -28,7 +28,8 @@ enum
 	PACKET_WRQ,     // Write Request packet
 	PACKET_DATA,    // Data packet
 	PACKET_ACK,     // Acknowledgement packet
-	PACKET_ERROR    // Error packet
+	PACKET_ERROR,   // Error packet
+	PACKET_OACK     // Option acknowledgment packet
 };
 
 /*
@@ -43,6 +44,7 @@ enum
  * 5         Unknown transfer ID.
  * 6         File already exists.
  * 7         No such user.
+ * 8         No such option.
  */
 
 enum
@@ -54,7 +56,8 @@ enum
 	ERROR_ILLEGAL,
 	ERROR_UNKNOWNTID,
 	ERROR_FILEEXISTS,
-	ERROR_NOUSER
+	ERROR_NOUSER,
+	ERROR_OPTION
 };
 
 // Max size of a TFTP packet, this size may change in the future

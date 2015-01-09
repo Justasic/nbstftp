@@ -31,12 +31,16 @@ typedef struct packetqueue_s
 
 typedef struct client_s
 {
+	// The socket the client is sending on.
 	socket_t s;
-        // Status variables
+	// Status variables
 	uint16_t currentblockno;
 	size_t actualblockno;
-        uint8_t waiting, sendingfile, destroy;
+	uint8_t waiting, sendingfile, destroy;
 	time_t nextresend;
+
+	// How much was transferred
+	ssize_t bytestransferred;
 
 	packetqueue_t lastpacket;
 
@@ -44,11 +48,12 @@ typedef struct client_s
 	// been received yet and we need to resend.
 	vec_t(packetqueue_t) packetqueue_vec;
 
-        // Current file we're sending
-        FILE *f;
+	// Current file we're sending
+	FILE *f;
 
-        // The client's Transfer ID, just the udp port
-        tid_t tid;
+	// The client's Transfer ID, just the udp port
+	tid_t tid;
+
 } client_t;
 
 typedef vec_t(client_t*) client_vec_t;
