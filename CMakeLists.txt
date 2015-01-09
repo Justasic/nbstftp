@@ -37,8 +37,6 @@ endif(EXISTS "${GIT_SHA_PATH}")
 SET(VERSION_SIMPLE "${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_LEVEL}")
 SET(VERSION_FULL "${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_LEVEL}-${VERSION_GIT}")
 
-message(STATUS "${PROJECT_NAME} version: ${VERSION_FULL}")
-
 # Cmake module path (if exists)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
@@ -66,6 +64,9 @@ endif (NOT NO_CLANG)
 # Finally initialize our project
 project(nbstftp C)
 
+# Announce our project and project version.
+message(STATUS "${PROJECT_NAME} version: ${VERSION_FULL}")
+
 include (CheckCCompilerFlag)
 
 # Make sure the compiler accepts C11
@@ -76,7 +77,7 @@ if (NOT HAVE_C11_FLAG)
 	#If the compiler doesn't have the -std=c11 flag, try and use the -std=c1x but let the user
 	# know that we may not be able to compile.
 	check_c_compiler_flag(-std=c1x HAVE_C1X_FLAG)
-	
+
 	if (NOT HAVE_C1X_FLAG)
 		message(FATAL_ERROR "Your compiler (${CMAKE_C_COMPILER}) MUST support C11. Try using CC=<alternative compiler>")
 	else (NOT HAVE_C1X_FLAG)
@@ -219,3 +220,13 @@ add_dependencies(${PROJECT_NAME} license_headers)
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
 install(FILES ${CMAKE_SOURCE_DIR}/doc/nbstftp.conf.example DESTINATION etc RENAME nbstftp.conf)
 # install(FILES ${MAN_FILE} DESTINATION man)
+
+# CPack information so we can create packages.
+include(InstallRequiredSystemLibraries)
+set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/doc/LICENSE")
+set (CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_MAJOR_VERSION}")
+set (CPACK_PACKAGE_VERSION_MINOR "${PROJECT_MINOR_VERSION}")
+set (CPACK_PACKAGE_VERSION_PATCH "${PROJECT_PATCH_LEVEL}-${VERSION_GIT}")
+set (CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set (CPACK_PACKAGE_VENDOR "Justin (Justasic) Crawford")
+include(CPack)
