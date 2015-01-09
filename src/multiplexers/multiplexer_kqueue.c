@@ -50,7 +50,7 @@ static inline kevent_t *GetChangeEvent(void)
 {
 	if (changed.length == changed.capacity)
 		vec_reserve(&changed, changed.length * 2);
-	
+
 	return &(changed.data[changed.length++]);
 }
 
@@ -113,25 +113,25 @@ int InitializeMultiplexer(void)
 	// Initialize
 	vec_init(&events);
 	vec_init(&changed);
-	
+
 	// Reserve some initial space
 	vec_reserve(&events, 5);
 	vec_reserve(&changed, 5);
-	
+
 	// Reinitialize the arrays.
 	memset(events.data, 0, sizeof(kevent_t) * 5);
 	memset(changed.data, 0, sizeof(kevent_t) * 5);
 
 	// Set kqueue idle timeout from config
 	kqtime.tv_sec = config->readtimeout;
-	
+
 	return 0;
 }
 
 int ShutdownMultiplexer(void)
 {
 	close(KqueueHandle);
-	
+
 	vec_deinit(&events);
 	vec_deinit(&changed);
 
@@ -142,32 +142,32 @@ void ProcessSockets(void)
 {
 	if (socketpool.length > events.capacity)
 		vec_reserve(&events, socketpool.length * 2);
-	
-	dprintf("Entering kevent\n");
-	
+
+	bprintf("Entering kevent\n");
+
 	int total = kevent(KqueueHandle, &vec_first(&changed), changed.length, &vec_first(&events), events.capacity, &kqtime);
-	
+
 	// Reset the changed count.
 	vec_clear(&changed);
-	
+
 	if (total == -1)
 	{
 		if (errno != EINTR)
 			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
 		return;
 	}
-	
+
 	for (int i = 0; i < total; ++i)
 	{
 		kevent_t *ev = &(events.data[i]);
-		
+
 		if (ev->flags & EV_ERROR)
 			continue;
-		
+
 		socket_t s;
 		if (FindSocket(ev->ident, &s) == -1)
 		{
-			dfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->ident);
+			bfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->ident);
 			// We don't know what socket this is. Someone added something
 			// stupid somewhere so shut this shit down now.
 			// We have to create a temporary socket_t object to remove it
@@ -177,28 +177,28 @@ void ProcessSockets(void)
 			close(ev->ident);
 			continue;
 		}
-		
+
 		// Call our event.
 		CallEvent(EV_SOCKETACTIVITY, &s);
-		
+
 		if (ev->flags & EV_EOF)
 		{
-			dprintf("Kqueue error reading socket %d, destroying.\n", s.fd);
+			bprintf("Kqueue error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
-		
+
 		// process socket read events.
 		if (ev->filter & EVFILT_READ && ReceivePackets(s) == -1)
 		{
-			dprintf("Destorying socket due to receive failure!\n");
+			bprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
-		
+
 		// Process socket write events
 		if (ev->filter & EVFILT_WRITE && SendPackets(s) == -1)
 		{
-			dprintf("Destorying socket due to send failure!\n");
+			bprintf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

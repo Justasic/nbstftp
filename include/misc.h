@@ -21,11 +21,11 @@
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 #ifndef NDEBUG
-# define dprintf(str, ...) printf(str, __VA_ARGS__)
-# define dfprintf(thing, str, ...) fprintf(thing, str, __VA_ARGS__)
+# define bprintf(...) printf(__VA_ARGS__)
+# define bfprintf(...) fprintf(__VA_ARGS__)
 #else
-# define dprintf(str, ...)
-# define dfprintf(thing, str, ...)
+# define bprintf(...)
+# define bfprintf(...)
 #endif
 
 extern int running;

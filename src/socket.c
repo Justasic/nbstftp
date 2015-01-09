@@ -50,7 +50,7 @@ int BindToSocket(const char *addr, short port)
 	// Get the address fanily
 	saddr.sa.sa_family = strstr(addr, ":") != NULL ? AF_INET6 : AF_INET;
 
-	dprintf("Address family is: %s\n", saddr.sa.sa_family == AF_INET6 ? "AF_INET6" : "AF_INET" );
+	bprintf("Address family is: %s\n", saddr.sa.sa_family == AF_INET6 ? "AF_INET6" : "AF_INET" );
 
 	// Set our port
 	*(saddr.sa.sa_family == AF_INET ? &saddr.in.sin_port : &saddr.in6.sin6_port) = htons(port);
@@ -279,7 +279,7 @@ void QueuePacket(client_t *c, packet_t *p, size_t len, uint8_t allocated)
 		c->lastpacket.p = nmalloc(len);
 		memcpy(c->lastpacket.p, p, len);
 	}
-	
+
 	// Mark the client as waiting again
 	if (!c->waiting)
 		;//c->waiting = 1;
@@ -304,7 +304,7 @@ int SendPackets(socket_t s)
 	{
 		vec_foreach(&c->packetqueue_vec, pq, idx)
 		{
-			dprintf("Sending packet %d length %zu\n", ntohs(pq.p->opcode), pq.len);
+			bprintf("Sending packet %d length %zu\n", ntohs(pq.p->opcode), pq.len);
 			
 			struct { socket_t *s; packet_t *p; client_t *c; size_t len; } ev = { &c->s, pq.p, c, pq.len };
 			CallEvent(EV_SENDING_PACKETS, &ev);
@@ -332,7 +332,7 @@ int SendPackets(socket_t s)
 				fflush(c->f);
 				fclose(c->f);
 			}
-			
+
 			RemoveClient(c);
 		}
 	}
@@ -369,8 +369,8 @@ int ReceivePackets(socket_t s)
 	// Either find the client or allocate a new client and socket
 	client_t *c = FindOrAllocateClient(cs);
 
-	dprintf("Received %zu bytes from %s:%d on socket %d\n", recvlen, GetAddress(cs.addr), GetPort(cs), s.fd);
-	
+	bprintf("Received %zu bytes from %s:%d on socket %d\n", recvlen, GetAddress(cs.addr), GetPort(cs), s.fd);
+
 	struct { socket_t *s; client_t *c; void *buf; size_t len; } ev = { &s, c, buf, recvlen };
 	CallEvent(EV_RECEIVING_PACKETS, &ev);
 

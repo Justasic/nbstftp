@@ -46,12 +46,12 @@ int AddToMultiplexer(socket_t *s)
 {
 	poll_t ev;
 	memset(&ev, 0, sizeof(poll_t));
-	
+
 	ev.fd = s->fd;
 	ev.events = POLLIN;
-	
+
 	s->flags = SF_READABLE;
-	
+
 	vec_push(&events, ev);
 	return 0;
 }
@@ -84,17 +84,17 @@ int SetSocketStatus(socket_t *s, int status)
 			return 0;
 		}
 	}
-	
+
 	return -1;
 }
 
 int InitializeMultiplexer(void)
 {
 	vec_init(&events);
-	
+
 	if (errno == ENOMEM)
 		return -1;
-	
+
 	return 0;
 }
 
@@ -106,30 +106,30 @@ int ShutdownMultiplexer(void)
 
 void ProcessSockets(void)
 {
-	dprintf("Entering poll\n");
-	
+	bprintf("Entering poll\n");
+
 	int total = poll(&vec_first(&events), events.length, config->readtimeout * 1000);
-	
+
 	if (total < 0)
 	{
 		if (errno != EINTR)
 			fprintf(stderr, "Error processing sockets: %s\n", strerror(errno));
 		return;
 	}
-	
+
 	for (int i = 0, processed = 0; i < events.length && processed != total; ++i)
 	{
 		poll_t *ev = &events.data[i];
-		
+
 		if (ev->revents != 0)
 			processed++;
 		else // Nothing to do, move on.
 			continue;
-		
+
 		socket_t s;
 		if (FindSocket(ev->fd, &s) == -1)
 		{
-			dfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->fd);
+			bfprintf(stderr, "Unknown FD in multiplexer: %d\n", ev->fd);
 			// We don't know what socket this is. Someone added something
 			// stupid somewhere so shut this shit down now.
 			// We have to create a temporary socket_t object to remove it
@@ -139,26 +139,26 @@ void ProcessSockets(void)
 			close(ev->fd);
 			continue;
 		}
-		
+
 		// Call our event.
 		CallEvent(EV_SOCKETACTIVITY, &s);
-		
+
 		if (ev->revents & (POLLERR | POLLRDHUP))
 		{
-			dprintf("Epoll error reading socket %d, destroying.\n", s.fd);
+			bprintf("Epoll error reading socket %d, destroying.\n", s.fd);
 			DestroySocket(s, 1);
 			continue;
 		}
-		
+
 		if (ev->revents & POLLIN && ReceivePackets(s) == -1)
 		{
-			dprintf("Destorying socket due to receive failure!\n");
+			bprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
-		
+
 		if (ev->revents & POLLOUT && SendPackets(s) == -1)
 		{
-			dprintf("Destorying socket due to send failure!\n");
+			bprintf("Destorying socket due to send failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

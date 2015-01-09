@@ -54,8 +54,8 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
 
-			dprintf("Got a data packet\n");
-			
+			bprintf("Got a data packet\n");
+
 			struct { const packet_t *p; client_t *c; } ev = { p, c };
 			CallEvent(EV_DATA_PACKET, &ev);
 
@@ -65,9 +65,9 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			{
 				c->currentblockno++;
 				c->actualblockno++;
-				
+
 				size_t flen = fwrite(((uint8_t*)p) + sizeof(packet_t), 1, len - sizeof(packet_t), c->f);
-				
+
 				char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
 				printf("Wrote block %d%s of length %zu (%s transferred)\r",
 				       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
@@ -100,10 +100,10 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 #else
 			char *error = strndup(((const char*)p) + sizeof(packet_t), 512);
 #endif
-			
+
 			struct { const packet_t *p; client_t *c; } ev = { p, c };
 			CallEvent(EV_ERROR_PACKET, &ev);
-			
+
 			printf("Error: %s (%d)\n", error, ntohs(p->blockno));
 
 			// Send an Acknowledgement packet.
@@ -136,13 +136,13 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				free(c->lastpacket.p);
 				c->lastpacket.allocated = c->lastpacket.len = 0;
 			}
-			
+
 			char *tmp2 = stringify(" (Actually %zu)", c->actualblockno);
 			printf("Got Acknowledgement packet for block %d%s from %s (%s transferred)\r",
 			       ntohs(p->blockno), ntohs(p->blockno) == c->actualblockno ? "" : tmp2,
 			       GetAddress(c->s.addr), GetBlockSize(c->actualblockno));
 			free(tmp2);
-			
+
 			struct { const packet_t *p; client_t *c; } ev = { p, c };
 			CallEvent(EV_ACK_PACKET, &ev);
 
@@ -195,22 +195,22 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 			}
 
 			int imode = strcasecmp(mode, "netascii");
-			
+
 			if (config->fixpath)
 				FixPath(filename);
 
 			char *tmp = NULL;
 			asprintf(&tmp, "%s/%s", config->directory, filename);
-			
+
 			// Something's fucked. We're out of memory, try and abort peacefully.
 			if (!tmp)
 			{
 				Error(c, ERROR_UNDEFINED, "Out of Memory");
 				break;
 			}
-			
-			dprintf("Checking we can open file \"%s\"\n", tmp);
-			
+
+			bprintf("Checking we can open file \"%s\"\n", tmp);
+
 			// Check that we have access to that file
 			if (access(tmp, W_OK) == -1 || access(config->directory, W_OK) == -1)
 			{
@@ -221,7 +221,7 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				}
 			}
 
-			dprintf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
+			bprintf("Opening file %s as %s\n", tmp, imode == 0 ? "wt" : "wb");
 			FILE *f = fopen(tmp, imode == 0 ? "wt" : "wb");
 			if (!f)
 			{
@@ -229,13 +229,13 @@ void ProcessPacket(client_t *c, void *buffer, size_t len)
 				goto end;
 			}
 
-			dprintf("File %s is available for write, writing first packet...\n", tmp);
+			bprintf("File %s is available for write, writing first packet...\n", tmp);
 
 			c->f = f;
 			c->currentblockno = 1;
 			c->actualblockno = 1;
 			c->sendingfile = 1;
-			
+
 			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
 				ev = { p, c, filename, mode, tmp };
 			CallEvent(EV_NEWWRITEREQUEST, &ev);
@@ -287,7 +287,7 @@ end:
 			}
 
 			int imode = strcasecmp(mode, "netascii");
-			
+
 			if (config->fixpath)
 				FixPath(filename);
 
@@ -309,7 +309,7 @@ end:
 			size_t len = ftell(f);
 			rewind(f);
 
-			dprintf("File \"%s\" is %s long, sending first packet\n", tmp, SizeReduce(len));
+			bprintf("File \"%s\" is %s long, sending first packet\n", tmp, SizeReduce(len));
 
 			// file buffer
 			uint8_t buf[512];
@@ -319,11 +319,11 @@ end:
 			c->currentblockno = 1;
 			c->actualblockno = 1;
 			c->sendingfile = 1;
-			
+
 			struct { const packet_t *p; client_t *c; char *filename, *mode, *path; }
 				ev = { p, c, filename, mode, tmp };
 			CallEvent(EV_NEWWRITEREQUEST, &ev);
-			
+
 			SendData(c, buf, readlen);
 
 #ifndef HAVE_STRNDUPA
@@ -335,11 +335,11 @@ end:
 			break;
                 }
 		default:
-			dprintf("Got unknown packet: %d\n", ntohs(p->opcode));
-			
+			bprintf("Got unknown packet: %d\n", ntohs(p->opcode));
+
 			struct { const packet_t *p; client_t *c; } ev = { p, c };
 			CallEvent(EV_UNKNOWN_PACKET, &ev);
-			
+
 			break;
 	}
 }

@@ -81,7 +81,7 @@ void RemoveClient(client_t *c)
 
 	// Remove the client from the client pool
 	vec_remove(&clientpool, c);
-	
+
 	// Free any remaining packets that are in the packet queue
 	vec_foreach(&c->packetqueue_vec, pq, idx)
 	{
@@ -91,7 +91,7 @@ void RemoveClient(client_t *c)
 
 	// Destroy the packet queue
 	vec_deinit(&c->packetqueue_vec);
-	
+
 	// Destroy any allocated resend packets
 	if (c->lastpacket.allocated)
 		free(c->lastpacket.p);
@@ -158,11 +158,11 @@ void CheckClients(void)
 				RemoveClient(c);
 				continue;
 			}
-			
+
 			struct { client_t *c; const packet_t *p; size_t len; } ev = { c, c->lastpacket.p, c->lastpacket.len };
 			CallEvent(EV_RESEND, &ev);
 
-			dprintf("Resending last packet, retry %d/3\n", c->waiting);
+			bprintf("Resending last packet, retry %d/3\n", c->waiting);
 			// Resend the packet
 			QueuePacket(c, c->lastpacket.p, c->lastpacket.len, 2);
 			//c->nextresend = time(NULL) + 5;
