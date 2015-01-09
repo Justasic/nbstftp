@@ -15,7 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 /*
- * Copyright (c) 2014, Justin Crawford <Justasic@gmail.com>
+ * Copyright (c) 2014-2015, Justin Crawford <Justasic@gmail.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any purpose
  * with or without fee is hereby granted, provided that the above copyright notice
