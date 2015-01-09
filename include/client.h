@@ -54,6 +54,11 @@ typedef struct client_s
 	// The client's Transfer ID, just the udp port
 	tid_t tid;
 
+	// The block transfer size.
+	uint32_t blksize;
+	// An actual data block.
+	void *blk;
+
 } client_t;
 
 typedef vec_t(client_t*) client_vec_t;

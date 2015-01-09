@@ -89,3 +89,4 @@ __attribute__((format(printf, 3, 4)))
 extern void Error(client_t *client, const uint16_t errnum, const char *str, ...);
 extern void Acknowledge(client_t *client, uint16_t blockno);
 extern void SendData(client_t *client, void *data, size_t len);
+extern void OptionAcknowledge(client_t *c, const char *option, const char *param);

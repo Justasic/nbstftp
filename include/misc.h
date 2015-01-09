@@ -40,5 +40,4 @@ extern int SwitchUserAndGroup(const char *user, const char *group);
 extern void Daemonize(void);
 extern int vasprintf(char **str, const char *fmt, va_list args);
 extern char *SizeReduce(size_t size);
-extern char *GetBlockSize(size_t blocks);
 extern char *stringify(const char *str, ...);

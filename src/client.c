@@ -41,6 +41,7 @@ void AddClient(client_t *c)
 
 	// The transfer ID is given as the port.
 	c->tid = -GetPort(c->s);
+	c->blksize = 512;
 }
 
 client_t *FindOrAllocateClient(socket_t cs)
@@ -95,6 +96,12 @@ void RemoveClient(client_t *c)
 	// Destroy any allocated resend packets
 	if (c->lastpacket.allocated)
 		free(c->lastpacket.p);
+
+	// Remove the client's block buffer.
+	if (c->blk)
+		free(c->blk);
+
+	printf("Removing client\n");
 
 	// Delete the client
 	free(c);

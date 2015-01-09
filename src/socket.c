@@ -117,7 +117,7 @@ int AddSocket(int fd, const char *addr, int type, socketstructs_t saddr, uint8_t
 	// According to RFC2348 this is the maximum size allowable.
 	// the + 4 is to include the 4 bytes of the TFTP header.
 	sock.pktlen = 65464 + 4;
-	sock.packet = malloc(sock.pktlen);
+	sock.packet = nmalloc(sock.pktlen);
 
 	// Add it to the multiplexer
 	if (binding)

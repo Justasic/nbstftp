@@ -166,17 +166,17 @@ void ProcessSockets(void)
 			continue;
 		}
 
-		// process socket read events.
-		if (ev->events & EPOLLIN && ReceivePackets(s) == -1)
-		{
-			bprintf("Destorying socket due to receive failure!\n");
-			DestroySocket(s, 1);
-		}
-
 		// Process socket write events
 		if (ev->events & EPOLLOUT && SendPackets(s) == -1)
 		{
 			bprintf("Destorying socket due to send failure!\n");
+			DestroySocket(s, 1);
+		}
+
+		// process socket read events.
+		if (ev->events & EPOLLIN && ReceivePackets(s) == -1)
+		{
+			bprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

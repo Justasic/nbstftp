@@ -161,7 +161,7 @@ int SwitchUserAndGroup(const char *user, const char *group)
 			return 1;
 		}
 	}
-	
+
 	// Check our directory permissions
 	int r = access(config->directory, R_OK) + 1, w = access(config->directory, W_OK) + 1;
 	if (!r && !w)
@@ -233,11 +233,6 @@ char *SizeReduce(size_t size)
 	static char str[25];
 	sprintf(str, "%zu %s", size, sz >= (sizeof(sizes) / sizeof(*sizes)) ? "(Hello Future!)" : sizes[sz]);
 	return str;
-}
-
-char *GetBlockSize(size_t blocks)
-{
-	return SizeReduce(blocks * 512);
 }
 
 char *stringify(const char *str, ...)

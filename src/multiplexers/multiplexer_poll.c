@@ -150,15 +150,15 @@ void ProcessSockets(void)
 			continue;
 		}
 
-		if (ev->revents & POLLIN && ReceivePackets(s) == -1)
-		{
-			bprintf("Destorying socket due to receive failure!\n");
-			DestroySocket(s, 1);
-		}
-
 		if (ev->revents & POLLOUT && SendPackets(s) == -1)
 		{
 			bprintf("Destorying socket due to send failure!\n");
+			DestroySocket(s, 1);
+		}
+
+		if (ev->revents & POLLIN && ReceivePackets(s) == -1)
+		{
+			bprintf("Destorying socket due to receive failure!\n");
 			DestroySocket(s, 1);
 		}
 	}

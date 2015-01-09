@@ -32,15 +32,17 @@
 
 void SendData(client_t *c, void *data, size_t len)
 {
-	// Make sure the packet size does not exceed the max packet length.
-        assert((len + sizeof(packet_t) <= MAX_PACKET_SIZE));
-        assert(c && data);
-	
+	// Previously we would make sure the data packets do not exceed a certain length
+	// but that would violate the blksize extension and therefore we trust that
+	// we are given the proper size.
+// 	assert((len + sizeof(packet_t) <= MAX_PACKET_SIZE));
+	assert(c && data);
+
 	// Allocate a packet that is as big as the data + len
 	packet_t *p = nmalloc(len + sizeof(packet_t));
 	p->opcode   = htons(PACKET_DATA);
 	p->blockno  = htons(c->currentblockno);
-	
+
 	// Cast the pointer, move to the end of the struct,
 	// then copy our data, this will mean we have a full
 	// packet struct.
@@ -52,7 +54,7 @@ void SendData(client_t *c, void *data, size_t len)
 	//
 	uint8_t *pptr = ((uint8_t*)p) + sizeof(packet_t);
 	memcpy(pptr, data, len);
-	
+
 	// Queue our packet for sending when EPoll comes around to send.
 	QueuePacket(c, p, len + sizeof(packet_t), 1);
 }
@@ -69,7 +71,7 @@ void Acknowledge(client_t *c, uint16_t blockno)
 	packet_t *p = nmalloc(sizeof(packet_t));
 	p->opcode = htons(PACKET_ACK);
 	p->blockno = htons(blockno);
-	
+
 	QueuePacket(c, p, sizeof(packet_t), 1);
 }
 
@@ -90,12 +92,14 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	va_start(ap, str);
 	size_t len = vasprintf(&buf, str, ap);
 	va_end(ap);
-	
+
 	if (len == -1)
 	{
 		fprintf(stderr, "ERROR: cannot format error string: %s\n", strerror(errno));
 		return;
 	}
+
+	bprintf("Error Packet: %s\n", buf);
 
 	// If your message is seriously bigger than 512 characters
 	// then you need to rethink what is going on.
@@ -106,17 +110,40 @@ void Error(client_t *c, const uint16_t errnum, const char *str, ...)
 	packet_t *p = nmalloc(len + sizeof(packet_t) + 1);
 	p->opcode   = htons(PACKET_ERROR);
 	p->blockno  = htons(errnum);
-	
+
 	// Fancy casting magic!
 	uint8_t *pptr = ((uint8_t*)p) + sizeof(packet_t);
 	strncpy((char*)pptr, buf, len);
 	// guaranteed null-termination.
 	pptr[len] = 0;
-	
+
 	QueuePacket(c, p, len + sizeof(packet_t) + 1, 1);
-	
+
 	// We don't care what they say now, destroy the client.
 	c->destroy = 1;
 
-        free(buf);
+	free(buf);
+}
+
+void OptionAcknowledge(client_t *c, const char *option, const char *param)
+{
+	//
+	//   2 bytes     string   1 byte    string   1 byte    string    1 byte     string   1 byte
+	//  +----------+---~~---+---------+---~~---+---------+---~~---+-----------+---~~---+---+
+	//  |  Opcode  |  opt1  |    0    | value1 |    0    |  optN  |     0     | valueN | 0 |
+	//  +----------+---~~---+---------+---~~---+---------+---~~---+-----------+---~~---+---+
+	//
+
+	assert(c && option && param);
+	packet_t *p = nmalloc(sizeof(packet_t) + strlen(option) + strlen(param) + 2);
+	p->opcode = htons(PACKET_OACK);
+
+	uint8_t *pptr = ((uint8_t*)p) + sizeof(uint16_t);
+	strcpy((char*)pptr, option);
+	pptr += strlen(option);
+	*pptr++ = '\0';
+	strcpy((char*)pptr, param);
+	*pptr = '\0';
+
+	QueuePacket(c, p, sizeof(packet_t) + strlen(option) + strlen(param) + 2, 1);
 }
