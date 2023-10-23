@@ -363,10 +363,7 @@ end:
 				c->blksize = blksize;
 			}
 			else if (!strcasecmp(opt, "tsize"))
-			{
 				tsize = 1;
-				// TODO. do nothing for now
-			}
 			else if (!strcasecmp(opt, "timeout"))
 			{
 				// TODO. do nothing for now.
